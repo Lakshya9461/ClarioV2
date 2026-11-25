@@ -126,5 +126,8 @@ const harnessSessionSchema = new mongoose.Schema(
   }
 );
 
+// Compound index for active session retrieval
+harnessSessionSchema.index({ userId: 1, updatedAt: -1 });
+
 const HarnessSession = mongoose.model('HarnessSession', harnessSessionSchema);
 export default HarnessSession;

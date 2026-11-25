@@ -1,19 +1,26 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
-import { Home } from './pages/Home';
-import { History } from './pages/History';
-import { QuestionDetail } from './pages/QuestionDetail';
-import { StudyLists } from './pages/StudyLists';
-import { Analytics } from './pages/Analytics';
-import { Shorts } from './pages/Shorts';
-import { LearningGraph } from './pages/LearningGraph';
-import { LearningHarness } from './pages/LearningHarness';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
+const Home = lazy(() => import('./pages/Home').then((m) => ({ default: m.Home })));
+const History = lazy(() => import('./pages/History').then((m) => ({ default: m.History })));
+const QuestionDetail = lazy(() => import('./pages/QuestionDetail').then((m) => ({ default: m.QuestionDetail })));
+const StudyLists = lazy(() => import('./pages/StudyLists').then((m) => ({ default: m.StudyLists })));
+const Analytics = lazy(() => import('./pages/Analytics').then((m) => ({ default: m.Analytics })));
+const Shorts = lazy(() => import('./pages/Shorts').then((m) => ({ default: m.Shorts })));
+const LearningGraph = lazy(() => import('./pages/LearningGraph').then((m) => ({ default: m.LearningGraph })));
+const LearningHarness = lazy(() => import('./pages/LearningHarness').then((m) => ({ default: m.LearningHarness })));
+const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
+const Register = lazy(() => import('./pages/Register').then((m) => ({ default: m.Register })));
+
+const RouteLoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-[40vh] p-8 text-xs font-mono text-slate-400">
+    <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-2" />
+    <span>Loading module...</span>
+  </div>
+);
 
 function AppLayout() {
   const location = useLocation();
@@ -24,26 +31,28 @@ function AppLayout() {
       {!isShorts && <Navbar />}
 
       <main className={isShorts ? 'flex-1 w-full h-[100dvh] overflow-hidden' : 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8'}>
-        <Routes>
-          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-          <Route path="/shorts" element={<ProtectedRoute><Shorts /></ProtectedRoute>} />
-          <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
-          <Route path="/questions/:id" element={<ProtectedRoute><QuestionDetail /></ProtectedRoute>} />
-          <Route path="/study-lists" element={<ProtectedRoute><StudyLists /></ProtectedRoute>} />
-          <Route path="/learning-map" element={<ProtectedRoute><LearningGraph /></ProtectedRoute>} />
-          <Route path="/harness" element={<ProtectedRoute><LearningHarness /></ProtectedRoute>} />
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute allowedRoles={['teacher', 'admin']}>
-                <Analytics />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Routes>
+            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="/shorts" element={<ProtectedRoute><Shorts /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+            <Route path="/questions/:id" element={<ProtectedRoute><QuestionDetail /></ProtectedRoute>} />
+            <Route path="/study-lists" element={<ProtectedRoute><StudyLists /></ProtectedRoute>} />
+            <Route path="/learning-map" element={<ProtectedRoute><LearningGraph /></ProtectedRoute>} />
+            <Route path="/harness" element={<ProtectedRoute><LearningHarness /></ProtectedRoute>} />
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedRoute allowedRoles={['teacher', 'admin']}>
+                  <Analytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </main>
 
       {/* Footer (hidden on immersive Shorts page) */}
