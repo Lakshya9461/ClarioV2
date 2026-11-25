@@ -301,15 +301,14 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
               aria-controls="panel-visualizer"
               aria-selected={activeTab === 'visualizer'}
               onClick={() => setActiveTab('visualizer')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 activeTab === 'visualizer'
-                  ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30 shadow-sm shadow-blue-500/10'
+                  ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
               }`}
             >
               <Activity className="w-3.5 h-3.5 text-blue-400" />
-              <span>Algorithm Visualizer</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span>visual trace</span>
             </button>
           )}
 
@@ -320,14 +319,14 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
               aria-controls="panel-ppt"
               aria-selected={activeTab === 'ppt'}
               onClick={() => setActiveTab('ppt')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none ${
                 activeTab === 'ppt'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
               }`}
             >
               <Presentation className="w-3.5 h-3.5 text-amber-400" />
-              <span>Slides ({slides.length})</span>
+              <span>slides ({slides.length})</span>
             </button>
           )}
 
@@ -337,14 +336,14 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
             aria-controls="panel-full"
             aria-selected={activeTab === 'full'}
             onClick={() => setActiveTab('full')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
               activeTab === 'full'
                 ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
             <FileText className="w-3.5 h-3.5 text-blue-400" />
-            <span>{hasSlides ? 'Documentation' : 'Answer'}</span>
+            <span>{hasSlides ? 'documentation' : 'answer'}</span>
           </button>
 
           {explanation && (
@@ -358,14 +357,14 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
                 setActiveTab('simplified');
               }}
               disabled={isSimplifying}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
                 activeTab === 'simplified'
                   ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
               }`}
             >
               <Baby className="w-3.5 h-3.5 text-purple-400" />
-              <span>ELI5 Analogy</span>
+              <span>intuitive model</span>
             </button>
           )}
         </div>
@@ -514,8 +513,8 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
 
           {keyPoints?.length > 0 && (
             <div className="rounded-xl bg-[#0a0f1a] border border-slate-800 p-5 space-y-3">
-              <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Key Conceptual Takeaways
+              <h4 className="text-xs font-mono font-semibold text-slate-300 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> key takeaways
               </h4>
               <ul className="space-y-2.5">
                 {keyPoints.map((pt, i) => (
@@ -548,11 +547,11 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
         >
           <div className="flex items-center gap-2 text-purple-300 font-display font-bold text-sm">
             <Baby className="w-5 h-5 text-purple-400" />
-            <span>First-Principles Intuitive Analogy (ELI5)</span>
+            <span>intuitive conceptual model</span>
           </div>
           {isSimplifying ? (
             <div className="py-8 text-center text-xs font-mono text-purple-300 animate-pulse">
-              Translating formal abstractions into everyday conceptual models...
+              Translating formal abstractions into conceptual models...
             </div>
           ) : (
             <p className="text-slate-300 text-sm sm:text-base leading-relaxed whitespace-pre-line">
@@ -569,9 +568,9 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
         {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="h-px bg-slate-800 flex-1" />
-          <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400 px-3 py-1 rounded-md bg-[#0a0f1a] border border-slate-800 flex items-center gap-1.5">
+          <span className="text-[11px] font-mono text-slate-400 px-3 py-1 rounded-md bg-[#0a0f1a] border border-slate-800 flex items-center gap-1.5">
             <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
-            <span>Interactive Follow-up Thread</span>
+            <span>discussion thread</span>
           </span>
           <div className="h-px bg-slate-800 flex-1" />
         </div>
@@ -672,9 +671,9 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
           <div className="panel-elevated p-4 sm:p-5 border border-slate-800 space-y-3">
             {/* Suggestion Chips */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-mono uppercase text-slate-500 flex items-center gap-1.5 shrink-0 font-semibold">
+              <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5 shrink-0 font-medium">
                 <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
-                Suggested inquiries:
+                suggested inquiries:
               </span>
               {suggestionPills.map((pill, i) => (
                 <button
@@ -682,7 +681,7 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
                   type="button"
                   disabled={isFollowUpStreaming}
                   onClick={() => handleSuggestionClick(pill)}
-                  className="px-2.5 py-1 rounded-md text-xs font-medium bg-[#101726] hover:bg-[#162035] border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-colors disabled:opacity-40"
+                  className="px-2.5 py-1 rounded-md text-xs font-mono bg-[#101726] hover:bg-[#162035] border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-colors disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
                 >
                   {pill}
                 </button>

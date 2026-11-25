@@ -1,36 +1,47 @@
+/* Hallmark · technical-utilitarian · cs-workbench · clario redesign */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════
    DESIGN TOKENS & SYSTEM BASE
-   Elite Computer Science Engineering Theme
+   High-Craft Computer Science Engineering Workbench
 ═══════════════════════════════════════════ */
 :root {
   --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --surface-base: #080c14;
-  --surface-card: #0e1422;
-  --surface-elevated: #141d2e;
-  --surface-hover: #1b263b;
-  --border-subtle: rgba(148, 163, 184, 0.1);
-  --border-strong: rgba(148, 163, 184, 0.2);
+  --surface-base: #06090f;
+  --surface-card: #0b101b;
+  --surface-elevated: #111827;
+  --surface-hover: #172033;
+  --border-subtle: #1e293b;
+  --border-strong: #334155;
+  --border-focus: #3b82f6;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
 
   --accent-cobalt: #2563eb;
   --accent-cobalt-light: #3b82f6;
+  --accent-cyan: #06b6d4;
   --accent-amber: #f59e0b;
   --accent-emerald: #10b981;
+  --accent-rose: #f43f5e;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-body {
+html, body {
+  overflow-x: clip;
+  margin: 0;
+  padding: 0;
   font-family: var(--font-sans);
   background-color: var(--surface-base);
-  color: #e2e8f0;
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -104,7 +115,7 @@ code, pre, .font-mono {
   background-color: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: 1rem;
-  transition: all 0.2s var(--ease-out-quart);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .panel-interactive:hover {
@@ -126,18 +137,17 @@ code, pre, .font-mono {
   font-weight: 600;
   font-size: 0.875rem;
   padding: 0.625rem 1.25rem;
-  border-radius: 0.75rem;
-  background-color: #2563eb;
+  border-radius: 0.5rem;
+  background-color: var(--accent-cobalt);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  transition: all 0.15s var(--ease-out-expo);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
   background-color: #1d4ed8;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -158,17 +168,17 @@ code, pre, .font-mono {
   font-weight: 600;
   font-size: 0.875rem;
   padding: 0.625rem 1.125rem;
-  border-radius: 0.75rem;
-  background-color: #141d2e;
-  color: #e2e8f0;
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  transition: all 0.15s var(--ease-out-expo);
+  border-radius: 0.5rem;
+  background-color: var(--surface-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #1b263b;
+  background-color: var(--surface-elevated);
+  border-color: var(--border-strong);
   color: #ffffff;
-  border-color: rgba(148, 163, 184, 0.3);
   transform: translateY(-1px);
 }
 
@@ -186,18 +196,16 @@ code, pre, .font-mono {
   font-weight: 600;
   font-size: 0.875rem;
   padding: 0.625rem 1.125rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   background-color: #d97706;
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition: all 0.15s var(--ease-out-expo);
+  transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
 .btn-amber:hover:not(:disabled) {
   background-color: #b45309;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
 }
 
 /* ═══════════════════════════════════════════
@@ -208,8 +216,17 @@ code, pre, .font-mono {
 }
 
 :focus-visible {
-  outline: 2px solid #3b82f6 !important;
+  outline: 2px solid var(--border-focus) !important;
   outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ═══════════════════════════════════════════

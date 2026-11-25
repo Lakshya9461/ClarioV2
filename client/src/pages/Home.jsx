@@ -15,10 +15,10 @@ import {
 } from 'lucide-react';
 
 const DOMAIN_PILLARS = [
-  { icon: Layers, label: 'Interactive Slide Decks', desc: '5-stage visual synthesis for viva prep' },
-  { icon: Cpu, label: 'Deep Technical Docs', desc: 'Low-level memory models & complexity' },
-  { icon: BarChart2, label: 'Empirical Charts', desc: 'Quantitative benchmark comparisons' },
-  { icon: Video, label: 'Curated Shorts Mode', desc: 'Redis-cached concept video reels' },
+  { icon: Layers, label: 'State traces', desc: 'Step-by-step algorithm and stack inspection' },
+  { icon: Cpu, label: 'Memory models', desc: 'Hardware architecture, cache, and heap layouts' },
+  { icon: BarChart2, label: 'Complexity proofs', desc: 'Empirical runtime analysis and edge cases' },
+  { icon: Video, label: 'Visual walk-throughs', desc: 'Focused concept summaries for viva preparation' },
 ];
 
 export const Home = () => {
@@ -40,24 +40,19 @@ export const Home = () => {
       {!hasActiveSession && (
         <div className="space-y-6 pt-6 sm:pt-10 pb-2 animate-fade-in">
           {/* Status Tag */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#101726] border border-slate-800 text-xs font-mono text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-200 font-semibold">CLARIO 2.4</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#101726] border border-slate-800 text-xs font-mono text-slate-300">
+            <span className="font-semibold text-blue-400">workbench</span>
             <span className="text-slate-600">//</span>
-            <span>B.Tech CSE & Systems Engineering</span>
+            <span>computer science and systems engineering</span>
           </div>
 
           {/* Headline */}
           <div className="space-y-3">
-            <h1 className="font-display text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              Master Technical Concepts With{' '}
-              <span className="text-blue-400 underline decoration-blue-500/40 underline-offset-8">
-                First-Principles Rigor
-              </span>
+            <h1 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
+              Understand how code and systems actually execute.
             </h1>
-            <p className="text-slate-400 text-sm sm:text-base max-w-2xl leading-relaxed font-sans">
-              Enter any computer science concept or algorithm. Clario generates structured slide
-              presentations, implementation blueprints, memory diagrams, and instant video shorts.
+            <p className="text-slate-300 text-sm sm:text-base max-w-2xl leading-relaxed font-sans">
+              Inspect verified algorithm execution traces, examine hardware memory hierarchies, and review structured concept proofs for technical interviews and viva exams.
             </p>
           </div>
 
@@ -66,13 +61,13 @@ export const Home = () => {
             {DOMAIN_PILLARS.map(({ icon: Icon, label, desc }) => (
               <div
                 key={label}
-                className="panel-base p-3.5 space-y-1 bg-[#0c121d] hover:bg-[#101726] transition-colors"
+                className="panel-base p-3.5 space-y-1.5 bg-[#0c121d] hover:bg-[#101726] transition-colors border border-slate-800/80 rounded-lg"
               >
-                <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center mb-2">
+                <div className="w-7 h-7 rounded-md bg-blue-500/10 text-blue-400 flex items-center justify-center">
                   <Icon className="w-4 h-4" />
                 </div>
-                <div className="text-xs font-bold text-slate-200">{label}</div>
-                <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                <div className="text-xs font-semibold text-slate-200">{label}</div>
+                <div className="text-[11px] text-slate-400 leading-snug">{desc}</div>
               </div>
             ))}
           </div>

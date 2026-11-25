@@ -263,8 +263,8 @@ export const LearningHarness = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white tracking-wide">Clario — Agent Harness for Learning</h1>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-semibold">
-                COGNITIVE TUTOR
+              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-medium">
+                cognitive tutor
               </span>
             </div>
             <p className="text-xs text-slate-400">
@@ -277,8 +277,8 @@ export const LearningHarness = () => {
         <div className="flex items-center gap-2">
           {session ? (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#141d2e] border border-slate-700 text-xs">
-              <span className="text-slate-400">PHASE:</span>
-              <span className="text-emerald-400 font-bold tracking-wider">{session.phase}</span>
+              <span className="text-slate-400">phase:</span>
+              <span className="text-emerald-400 font-bold">{session.phase.toLowerCase()}</span>
             </div>
           ) : (
             <div className="text-xs text-slate-500 font-mono">Status: Ready</div>
@@ -287,7 +287,7 @@ export const LearningHarness = () => {
             <button
               onClick={handleResetSession}
               title="Reset session and start over"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 border border-slate-700/60 text-xs transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 border border-slate-700/60 text-xs transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset</span>
@@ -319,51 +319,48 @@ export const LearningHarness = () => {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveWorkspaceTab('dialogue')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 activeWorkspaceTab === 'dialogue'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  ? 'bg-blue-600 text-white shadow-sm'
                   : 'bg-[#0e1424] text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
               <Terminal className="w-3.5 h-3.5" />
-              <span>Socratic Dialogue ({session.phase})</span>
+              <span>socratic dialogue ({session.phase.toLowerCase()})</span>
             </button>
 
             <button
               onClick={() => setActiveWorkspaceTab('visualizer')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                 activeWorkspaceTab === 'visualizer'
-                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-500/20'
+                  ? 'bg-cyan-600 text-white shadow-sm'
                   : 'bg-[#0e1424] text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
               <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Interactive Visualizer</span>
-              {session.visualizationTrace && (
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-              )}
+              <span>interactive visualizer</span>
             </button>
 
             <button
               onClick={() => setActiveWorkspaceTab('artifacts')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
                 activeWorkspaceTab === 'artifacts'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                  ? 'bg-emerald-600 text-white shadow-sm'
                   : 'bg-[#0e1424] text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
               <Database className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Created Propositions ({knowledgeGraph.propositions?.length || 0})</span>
+              <span>propositions ({knowledgeGraph.propositions?.length || 0})</span>
             </button>
           </div>
 
           <button
             onClick={() => navigate('/', { state: { autoAsk: session.goal } })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-purple-600/30 hover:from-blue-600/50 hover:to-purple-600/50 border border-blue-500/40 text-blue-200 text-xs font-sans font-bold transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141e30] hover:bg-[#1a273e] border border-blue-500/40 text-blue-200 text-xs font-mono font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
             title="Generate full slide deck presentation and deep dive on Home"
           >
             <Presentation className="w-3.5 h-3.5 text-blue-400" />
-            <span>✨ Synthesize Slides & Deep Dive</span>
+            <span>synthesize slide deck</span>
           </button>
         </div>
       )}
@@ -797,8 +794,8 @@ export const LearningHarness = () => {
                   {/* Confidence Slider */}
                   <div className="space-y-1.5 p-3 rounded-lg bg-[#090d16] border border-slate-800">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-400 font-bold">CONFIDENCE:</span>
-                      <span className="text-blue-400 font-mono font-bold">{confidence}%</span>
+                      <span className="text-slate-400 font-medium">confidence:</span>
+                      <span className="text-blue-400 font-mono font-medium">{confidence}%</span>
                     </div>
                     <input
                       type="range"
@@ -806,28 +803,28 @@ export const LearningHarness = () => {
                       max="100"
                       value={confidence}
                       onChange={(e) => setConfidence(Number(e.target.value))}
-                      className="w-full accent-blue-500 cursor-pointer"
+                      className="w-full accent-blue-500 cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
                     />
                   </div>
 
                   {/* Thinking Field */}
                   <div className="space-y-1.5">
-                    <label className="text-xs text-slate-300 font-bold">
-                      YOUR THINKING: <span className="text-rose-400 font-normal">*Required</span>
+                    <label className="text-xs text-slate-300 font-medium">
+                      your reasoning (required):
                     </label>
                     <textarea
                       rows={3}
                       value={thinking}
                       onChange={(e) => setThinking(e.target.value)}
                       placeholder="Why do you predict this behavior? Explain your underlying reasoning."
-                      className="w-full px-3 py-2 rounded-lg bg-[#090d16] border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-blue-500 font-sans leading-relaxed"
+                      className="w-full px-3 py-2 rounded-lg bg-[#090d16] border border-slate-700 text-slate-200 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-sans leading-relaxed"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-xs font-bold"
+                    className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-xs font-medium focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
                   >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     <span>Submit Prediction</span>
@@ -841,20 +838,20 @@ export const LearningHarness = () => {
           {session?.phase === 'PRACTICE' && currentPracticeProblem && (
             <div className="panel-base p-6 bg-[#0e1424] border border-slate-800 space-y-5 animate-fade-in">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider">
-                  PRACTICE — REASONING CHALLENGE
+                <div className="text-xs text-emerald-400 font-medium">
+                  practice: reasoning challenge
                 </div>
                 <span className="text-xs text-slate-400 font-mono">
-                  PROBLEM ({currentPracticeProblem.problemIndex}/{currentPracticeProblem.totalProblems})
+                  problem ({currentPracticeProblem.problemIndex}/{currentPracticeProblem.totalProblems})
                 </span>
               </div>
 
               <div className="space-y-2">
                 <div className="text-xs text-slate-400">
-                  Target Invariant: <span className="text-white font-bold">{currentPracticeProblem.targetConcept}</span>
+                  Target Invariant: <span className="text-white font-medium">{currentPracticeProblem.targetConcept}</span>
                   {currentPracticeProblem.isTargetShaky && (
                     <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      [!] Shaky Node Focus
+                      shaky node focus
                     </span>
                   )}
                 </div>
@@ -865,22 +862,22 @@ export const LearningHarness = () => {
 
               <form onSubmit={handlePracticeSubmit} className="space-y-4 pt-1">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-300 font-bold">
-                    YOUR SOLUTION & REASONING:
+                  <label className="text-xs text-slate-300 font-medium">
+                    your solution and reasoning:
                   </label>
                   <textarea
                     rows={4}
                     value={practiceAnswer}
                     onChange={(e) => setPracticeAnswer(e.target.value)}
                     placeholder="Provide your solution and the core invariant reasoning behind it. We grade reasoning, not keywords."
-                    className="w-full px-3 py-2 rounded-lg bg-[#090d16] border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-blue-500 font-sans leading-relaxed"
+                    className="w-full px-3 py-2 rounded-lg bg-[#090d16] border border-slate-700 text-slate-200 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-sans leading-relaxed"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-xs font-bold"
+                  className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-xs font-medium focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
                 >
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   <span>Submit Practice Solution</span>
@@ -889,8 +886,8 @@ export const LearningHarness = () => {
 
               {lastFeedback && (
                 <div className="p-3.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs space-y-1 font-sans animate-fade-in">
-                  <div className="font-bold text-blue-400">
-                    Evaluation: {lastFeedback.isSound ? 'SOUND REASONING' : 'NEEDS REFINEMENT'}
+                  <div className="font-medium text-blue-400">
+                    Evaluation: {lastFeedback.isSound ? 'sound reasoning' : 'needs refinement'}
                   </div>
                   <p className="text-slate-300 leading-relaxed">{lastFeedback.feedback}</p>
                 </div>

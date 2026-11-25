@@ -84,7 +84,7 @@ export const SlideDeckView = ({
     <div
       role="region"
       aria-label="Structured Concept Slide Deck"
-      className={`relative transition-all duration-200 ${
+      className={`relative ${
         isFullscreen
           ? 'fixed inset-0 z-50 bg-[#080c14] p-6 sm:p-10 flex flex-col justify-between overflow-y-auto'
           : 'panel-elevated overflow-hidden border border-slate-800'
@@ -93,9 +93,9 @@ export const SlideDeckView = ({
       {/* ── Slide Header Toolbar ── */}
       <div className="flex items-center justify-between px-5 sm:px-6 py-3 border-b border-slate-800/80 bg-[#0a0f1a]">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-mono font-semibold">
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-mono font-medium">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Structured Concept Deck</span>
+            <span>concept deck</span>
           </div>
           {slide?.badge && (
             <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-2.5 py-0.5 rounded-md border border-slate-700/60 hidden sm:inline">
@@ -108,16 +108,16 @@ export const SlideDeckView = ({
           {hasVisualizer && onOpenVisualizer && (
             <button
               onClick={onOpenVisualizer}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               title="Launch interactive algorithm visualizer"
             >
-              <Activity className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-              <span>Interactive Visualizer</span>
+              <Activity className="w-3.5 h-3.5 text-blue-400" />
+              <span>visual trace</span>
             </button>
           )}
 
           {/* Slide counter */}
-          <span className="text-xs font-mono font-semibold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-md border border-slate-700/60 tabular-nums">
+          <span className="text-xs font-mono font-medium text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-md border border-slate-700/60 tabular-nums">
             {currentSlide + 1} / {totalSlides}
           </span>
 
@@ -126,7 +126,7 @@ export const SlideDeckView = ({
             onClick={() => setIsFullscreen(!isFullscreen)}
             title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Present Fullscreen (F)'}
             aria-label={isFullscreen ? 'Exit Fullscreen' : 'Present Fullscreen'}
-            className="p-1.5 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -139,13 +139,13 @@ export const SlideDeckView = ({
           {/* Slide Meta Banner */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
-                {slide.badge || `Slide ${currentSlide + 1}`}
+              <span className="text-xs font-mono font-medium text-amber-400 lowercase">
+                {slide.badge || `slide ${currentSlide + 1}`}
               </span>
               {subjectTag && <TagBadge tag={subjectTag} size="xs" />}
             </div>
 
-            <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+            <h2 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight">
               {slide.title}
             </h2>
 
@@ -163,8 +163,8 @@ export const SlideDeckView = ({
                 <Brain className="w-4 h-4" />
               </div>
               <div>
-                <strong className="text-amber-300 block text-xs font-mono uppercase tracking-wider mb-0.5 font-bold">
-                  Core Architectural Insight
+                <strong className="text-amber-300 block text-xs font-mono mb-0.5 font-semibold">
+                  architectural insight
                 </strong>
                 {slide.keyConcept}
               </div>
@@ -174,8 +174,8 @@ export const SlideDeckView = ({
           {/* Process Flow Diagram (If slide has processSteps) */}
           {slide.processSteps && slide.processSteps.length > 0 && (
             <div className="space-y-2.5 pt-1">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-bold block">
-                Execution Pipeline & State Transitions
+              <span className="text-[11px] font-mono text-slate-400 font-medium block">
+                execution pipeline and state transitions
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {slide.processSteps.slice(0, 3).map((step, idx) => (

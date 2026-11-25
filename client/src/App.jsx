@@ -48,29 +48,22 @@ function AppLayout() {
 
       {/* Footer (hidden on immersive Shorts page) */}
       {!isShorts && (
-        <footer className="border-t border-slate-800/80 bg-[#080c14]/90 backdrop-blur-md py-6 mt-16">
+        <footer className="border-t border-slate-800 bg-[#06090f] py-6 mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <div className="w-5 h-5 rounded bg-blue-600 flex items-center justify-center shadow-sm">
-                <span className="text-[9px] text-white font-mono font-bold">C</span>
+                <span className="text-[10px] text-white font-mono font-bold">C</span>
               </div>
-              <p className="text-xs text-slate-400 font-medium">
-                Clario <span className="text-slate-600">//</span> Computer Science & Engineering Cognitive Portal
+              <p className="text-xs text-slate-400 font-normal">
+                Clario: computer science engineering workbench
               </p>
             </div>
             <div className="flex items-center gap-3 text-xs font-mono text-slate-500">
               <span>React 18</span>
-              <span className="text-slate-700">·</span>
               <span>Express</span>
-              <span className="text-slate-700">·</span>
               <span>MongoDB</span>
-              <span className="text-slate-700">·</span>
-              <span>Redis Upstash</span>
-              <span className="text-slate-700">·</span>
-              <span className="text-emerald-500 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                SSE Streaming
-              </span>
+              <span>Redis</span>
+              <span className="text-slate-400">SSE streaming</span>
             </div>
           </div>
         </footer>

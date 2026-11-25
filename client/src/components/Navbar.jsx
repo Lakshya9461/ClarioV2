@@ -81,21 +81,21 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* ── Brand Logo ── */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-mono font-bold text-base shadow-sm group-hover:bg-blue-500 transition-colors">
-              <Layers className="w-5 h-5 text-white" />
+          <Link to="/" className="flex items-center gap-3 group focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded-lg">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-mono font-bold text-sm shadow-sm group-hover:bg-blue-500 transition-colors">
+              <Layers className="w-4 h-4 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-display font-extrabold text-lg tracking-tight text-white leading-none">
-                  Clario
+                <span className="font-display font-bold text-base text-white leading-none">
+                  clario
                 </span>
-                <span className="text-[10px] font-mono uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">
-                  CSE
+                <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
+                  cs-lab
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-slate-500 leading-none mt-1 hidden sm:block tracking-wide">
-                COGNITIVE ENGINEERING WORKSTATION
+              <p className="text-[11px] font-mono text-slate-400 leading-none mt-1 hidden sm:block">
+                computer science workbench
               </p>
             </div>
           </Link>
@@ -114,7 +114,7 @@ export const Navbar = () => {
                     key={item.name}
                     to={item.path}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                    className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                       isActive
                         ? 'bg-[#182238] text-white shadow-sm border border-slate-700/60'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
@@ -142,7 +142,7 @@ export const Navbar = () => {
                   onClick={handleLogout}
                   title="Sign Out"
                   aria-label="Sign Out"
-                  className="p-2 text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg border border-transparent hover:border-rose-500/20 transition-all"
+                  className="p-2 text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg border border-transparent hover:border-rose-500/20 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -151,15 +151,15 @@ export const Navbar = () => {
               <div className="flex items-center gap-2.5">
                 <Link
                   to="/login"
-                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white rounded-lg hover:bg-white/[0.05] transition-all"
+                  className="px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/[0.05] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
                 >
-                  Sign In
+                  Sign in
                 </Link>
                 <Link
                   to="/register"
                   className="btn-primary text-xs py-1.5 px-3.5"
                 >
-                  Create Account
+                  Create account
                 </Link>
               </div>
             )}

@@ -173,7 +173,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
       ref={containerRef}
       role="region"
       aria-label={title || 'Algorithm Execution Visualizer'}
-      className={`rounded-2xl border border-slate-800 bg-[#070b12] text-slate-200 overflow-hidden shadow-2xl transition-all focus:outline-none ${
+      className={`rounded-2xl border border-slate-800 bg-[#070b12] text-slate-200 overflow-hidden shadow-2xl focus:outline-none ${
         isFullscreen ? 'fixed inset-4 z-50 flex flex-col' : 'w-full'
       }`}
     >
@@ -188,12 +188,12 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
               <h3 className="font-display text-base sm:text-lg font-bold text-white tracking-tight">
                 {title || 'Algorithm Execution Visualizer'}
               </h3>
-              <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/25 uppercase">
-                {category || 'Algorithm'}
+              <span className="px-2 py-0.5 text-[10px] font-mono rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/25 lowercase">
+                {category || 'algorithm'}
               </span>
             </div>
             <p className="text-xs font-mono text-slate-400 mt-0.5">
-              Step {currentStepIndex + 1} of {steps.length} · {activeStep.state?.actionMessage || activeStep.description}
+              step {currentStepIndex + 1} of {steps.length} — {activeStep.state?.actionMessage || activeStep.description}
             </p>
           </div>
         </div>
@@ -507,10 +507,10 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
         <div className="lg:col-span-5 p-5 sm:p-6 bg-[#080d17] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-              <span className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
-                <Code2 className="w-4 h-4 text-blue-400" /> Active Pseudocode
+              <span className="flex items-center gap-1.5 text-xs font-mono font-medium text-slate-300">
+                <Code2 className="w-4 h-4 text-blue-400" /> active pseudocode
               </span>
-              <span className="text-[11px] font-mono text-slate-500">Line {codeLine + 1}</span>
+              <span className="text-[11px] font-mono text-slate-500">line {codeLine + 1}</span>
             </div>
 
             {/* Pseudocode Editor Line-by-Line */}
@@ -529,7 +529,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
                     ref={(el) => (codeLinesRef.current[lIdx] = el)}
                     className={`flex items-center px-2 py-1 rounded transition-colors ${
                       isActiveLine
-                        ? 'bg-blue-600/25 border-l-2 border-blue-400 text-white font-bold shadow-sm'
+                        ? 'bg-blue-600/25 border-l-2 border-blue-400 text-white font-medium shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
@@ -538,7 +538,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
                     </span>
                     <span className="flex-1 whitespace-pre">{line}</span>
                     {isActiveLine && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping ml-2 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 ml-2 shrink-0" />
                     )}
                   </div>
                 );
@@ -548,8 +548,8 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
 
           {/* Step Detail Card */}
           <div className="mt-5 p-4 rounded-xl bg-[#0e1422] border border-slate-800">
-            <span className="text-[10px] font-mono font-bold uppercase text-slate-500 tracking-wider block mb-1">
-              Pedagogical Insight
+            <span className="text-[11px] font-mono text-slate-400 block mb-1">
+              pedagogical insight
             </span>
             <p className="text-xs text-slate-300 leading-relaxed font-sans">
               {activeStep.description}
@@ -586,7 +586,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
             onClick={togglePlay}
             title={isPlaying ? 'Pause animation (Space or K)' : 'Play animation (Space or K)'}
             aria-label={isPlaying ? 'Pause animation (Space or K)' : 'Play animation (Space or K)'}
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-md focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
             {isPlaying ? (
               <>
@@ -656,15 +656,15 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
               aria-pressed={playbackSpeed === spd}
               className={`px-2 py-0.5 rounded text-[11px] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 playbackSpeed === spd
-                  ? 'bg-blue-600 text-white font-bold'
+                  ? 'bg-blue-600 text-white font-medium'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
               {spd}x
             </button>
           ))}
-          <span className="hidden lg:inline text-[10px] text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded">
-            {'Space: Play · ←/→: Step · F: Fullscreen'}
+          <span className="hidden lg:inline text-[10px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded">
+            {'Space: play, ←/→: step, F: fullscreen'}
           </span>
         </div>
       </div>
