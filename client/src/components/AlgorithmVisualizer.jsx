@@ -654,7 +654,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
               onClick={() => setPlaybackSpeed(spd)}
               aria-label={`Set speed to ${spd}x`}
               aria-pressed={playbackSpeed === spd}
-              className={`px-2 py-0.5 rounded text-[11px] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+              className={`min-h-[32px] min-w-[32px] sm:min-h-[26px] sm:min-w-[26px] px-2 py-1 sm:py-0.5 rounded text-[11px] font-mono flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 playbackSpeed === spd
                   ? 'bg-blue-600 text-white font-medium'
                   : 'bg-slate-800 text-slate-400 hover:text-white'

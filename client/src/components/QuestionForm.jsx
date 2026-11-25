@@ -76,7 +76,7 @@ export const QuestionForm = ({ onSubmit, isLoading, status }) => {
             {showCounter && (
               <span
                 className={`absolute bottom-3 left-4 text-[10px] font-mono tabular-nums ${
-                  isNearLimit ? 'text-rose-400' : 'text-slate-500'
+                  isNearLimit ? 'text-rose-400' : 'text-slate-400'
                 }`}
               >
                 {charCount} / 1000 chars

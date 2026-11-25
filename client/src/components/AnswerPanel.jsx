@@ -624,7 +624,7 @@ export const AnswerPanel = ({ state, onSimplify, onReset, onFollowUp }) => {
                     </div>
                   )}
 
-                  <span className="text-[10px] text-slate-500 block text-right mt-2 font-mono">
+                  <span className="text-[10px] text-slate-400 block text-right mt-2 font-mono">
                     {new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
