@@ -170,37 +170,92 @@ export const updateKnowledgeGraphPropositions = (newOrUpdated = [], newChains = 
 };
 
 /**
- * Generates 3-5 prerequisite probes for a learning goal
+ * Domain-adaptive fallback probes when LLM is unavailable or times out
  */
-export const generatePrerequisiteProbes = async (goal, existingGraph = { propositions: [] }) => {
-  const solidItems = existingGraph.propositions
-    .filter((p) => p.status === 'solid')
-    .map((p) => p.claim);
+export const buildDomainFallbackProbes = (goal) => {
+  const g = (goal || '').toLowerCase();
 
-  const fallbackProbes = [
+  if (
+    g.includes('cpu') ||
+    g.includes('ram') ||
+    g.includes('memory') ||
+    g.includes('hardware') ||
+    g.includes('register') ||
+    g.includes('cache') ||
+    g.includes('storage') ||
+    g.includes('bus')
+  ) {
+    return [
+      {
+        probeIndex: 1,
+        totalProbes: 3,
+        concept: 'Processing vs Temporary Storage',
+        question: 'While a computer runs an application, which hardware component is actively executing arithmetic operations and instructions?',
+        options: [
+          'A) RAM',
+          'B) CPU',
+          'C) Solid State Drive (SSD)',
+          "D) I don't know",
+        ],
+        correctOption: 'B',
+        probeReasoning: 'Tests prerequisite understanding that the CPU computes while RAM holds volatile working data.',
+      },
+      {
+        probeIndex: 2,
+        totalProbes: 3,
+        concept: 'Active Workspace & Volatility',
+        question: 'If power is abruptly cut to a computer, what happens to unsaved data residing in RAM?',
+        options: [
+          'A) It is lost immediately because RAM is volatile memory',
+          'B) It persists indefinitely until manually deleted',
+          'C) It is automatically copied into CPU registers permanently',
+          "D) I don't know",
+        ],
+        correctOption: 'A',
+        probeReasoning: 'Tests prerequisite understanding of volatile working memory vs non-volatile storage.',
+      },
+      {
+        probeIndex: 3,
+        totalProbes: 3,
+        concept: 'Memory Hierarchy & Access Latency',
+        question: 'Why does a CPU fetch active program instructions from RAM rather than reading exclusively from a hard drive or SSD?',
+        options: [
+          'A) RAM provides vastly lower access latency and higher throughput to keep the CPU fed',
+          'B) Disks cannot physically store binary machine instructions',
+          'C) The CPU can only read data when an active internet connection is present',
+          "D) I don't know",
+        ],
+        correctOption: 'A',
+        probeReasoning: 'Tests prerequisite understanding of memory hierarchy and latency bottlenecks.',
+      },
+    ];
+  }
+
+  // Default algorithmic / systems fallback
+  return [
     {
       probeIndex: 1,
       totalProbes: 3,
-      concept: `${goal} - Fundamental State`,
-      question: `Consider what happens during execution of ${goal}. If an invariant fails on step 1, what does the execution state hold?`,
+      concept: `${goal} - State Invariants & Boundaries`,
+      question: `Before processing steps in ${goal}, what condition must hold regarding input boundaries and execution state?`,
       options: [
-        'A) The program immediately proceeds to terminal output',
-        'B) State remains bounded until explicit termination or error occurs',
-        'C) Memory allocations are doubled automatically by the runtime',
+        'A) Inputs must satisfy defined invariants or edge constraints before state transitions',
+        'B) Inputs are automatically replaced with random default values by the runtime',
+        'C) Execution runs backwards if invalid arguments are supplied',
         "D) I don't know",
       ],
-      correctOption: 'B',
-      probeReasoning: 'Tests prerequisite understanding of execution state invariants and error propagation.',
+      correctOption: 'A',
+      probeReasoning: 'Tests prerequisite understanding of preconditions and boundary constraints.',
     },
     {
       probeIndex: 2,
       totalProbes: 3,
-      concept: `${goal} - Memory / Environment Scope`,
-      question: `When a subroutine or scope is entered, how are local frames and references preserved?`,
+      concept: `${goal} - Execution Scope & Scaffolding`,
+      question: 'When an operation or subroutine is invoked, how are local variables and intermediate evaluation results isolated?',
       options: [
         'A) All variables overwrite global registry values directly',
-        'B) A stack frame or lexical scope isolates variables until exit',
-        'C) Memory is allocated on a separate network thread',
+        'B) A stack frame or lexical scope isolates variables until completion',
+        'C) Variables are dispatched across a separate network thread',
         "D) I don't know",
       ],
       correctOption: 'B',
@@ -209,18 +264,29 @@ export const generatePrerequisiteProbes = async (goal, existingGraph = { proposi
     {
       probeIndex: 3,
       totalProbes: 3,
-      concept: `${goal} - Termination / Base Transition`,
-      question: `What distinguishes a controlled termination condition from an infinite iteration/recursion?`,
+      concept: `${goal} - Deterministic Termination`,
+      question: 'What guarantees that a computational sequence or repetition reaches completion without hanging?',
       options: [
-        'A) Execution reaches a base check where no further recursive invocation occurs',
-        'B) The operating system forcibly kills the process after 5 seconds',
-        'C) Variables wrap around to negative numbers',
+        'A) Execution reaches a verified base condition where no further recursive invocation or loop iteration occurs',
+        'B) The operating system forcibly kills all processes after 5 seconds',
+        'C) Variables automatically wrap around to negative numbers',
         "D) I don't know",
       ],
       correctOption: 'A',
       probeReasoning: 'Tests prerequisite understanding of base conditions and termination.',
     },
   ];
+};
+
+/**
+ * Generates 3-5 prerequisite probes for a learning goal
+ */
+export const generatePrerequisiteProbes = async (goal, existingGraph = { propositions: [] }) => {
+  const solidItems = existingGraph.propositions
+    .filter((p) => p.status === 'solid')
+    .map((p) => p.claim);
+
+  const fallbackProbes = buildDomainFallbackProbes(goal);
 
   if (!shouldUseLLM()) {
     return fallbackProbes;
@@ -251,7 +317,7 @@ Output ONLY valid JSON in this exact structure:
 ]`;
 
     const userPrompt = `Learning Goal: "${goal}"\nGenerate the diagnostic prerequisite probes.`;
-    const response = await callLLM(systemPrompt, userPrompt, 1500, 25000);
+    const response = await callLLM(systemPrompt, userPrompt, 1500, 45000);
     if (response) {
       const match = response.match(/\[\s*\{[\s\S]*\}\s*\]/);
       if (match) {
@@ -330,7 +396,7 @@ Learner Selected Option: "${selectedOption}"
 Confidence: ${confidence}%
 Learner Thinking: "${thinking}"`;
 
-    const response = await callLLM(systemPrompt, userPrompt, 500, 5000);
+    const response = await callLLM(systemPrompt, userPrompt, 500, 35000);
     if (response) {
       const match = response.match(/\{[\s\S]*\}/);
       if (match) {
@@ -435,7 +501,7 @@ Output ONLY valid JSON:
 }`;
 
     const userPrompt = `Goal: "${goal}"\nProbe Evaluation Results:\n${JSON.stringify(probeResults, null, 2)}`;
-    const response = await callLLM(systemPrompt, userPrompt, 1000, 6000);
+    const response = await callLLM(systemPrompt, userPrompt, 1000, 45000);
     if (response) {
       const match = response.match(/\{[\s\S]*\}/);
       if (match) {
@@ -509,7 +575,7 @@ Output ONLY valid JSON:
 }`;
 
     const userPrompt = `Goal: "${goal}"\nCurrent node to teach: "${nodeName}"\nPrevious node: "${previousNodeName || 'prerequisites'}"`;
-    const response = await callLLM(systemPrompt, userPrompt, 800, 5000);
+    const response = await callLLM(systemPrompt, userPrompt, 800, 40000);
     if (response) {
       const match = response.match(/\{[\s\S]*\}/);
       if (match) {
@@ -641,7 +707,7 @@ Confidence: ${confNumber}%
 Learner Thinking: "${thinking}"
 Attempt: ${attemptNumber}`;
 
-    const response = await callLLM(systemPrompt, userPrompt, 1000, 6000);
+    const response = await callLLM(systemPrompt, userPrompt, 1000, 45000);
     if (response) {
       const match = response.match(/\{[\s\S]*\}/);
       if (match) {
@@ -711,7 +777,7 @@ Output ONLY valid JSON:
 ]`;
 
     const userPrompt = `Goal: "${goal}"\nGenerate practice problems.`;
-    const response = await callLLM(systemPrompt, userPrompt, 1200, 6000);
+    const response = await callLLM(systemPrompt, userPrompt, 1200, 45000);
     if (response) {
       const match = response.match(/\[\s*\{[\s\S]*\}\s*\]/);
       if (match) {
@@ -765,7 +831,7 @@ Output ONLY valid JSON:
 Target Concept: "${targetConcept}"
 Learner Reasoning: "${learnerResponse}"`;
 
-    const response = await callLLM(systemPrompt, userPrompt, 500, 5000);
+    const response = await callLLM(systemPrompt, userPrompt, 500, 35000);
     if (response) {
       const match = response.match(/\{[\s\S]*\}/);
       if (match) {
