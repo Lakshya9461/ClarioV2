@@ -75,9 +75,20 @@ export const submitResponse = async (req, res, next) => {
     const { id } = req.params;
     const { responseType, data } = req.body;
 
-    const session = await HarnessSession.findOne({ _id: id, userId: req.user._id });
+    let session = await HarnessSession.findOne({ _id: id, userId: req.user._id });
     if (!session) {
-      return res.status(404).json({ ok: false, message: 'Harness session not found.' });
+      // If server re-authenticated under demo role fallback, check by ID
+      session = await HarnessSession.findById(id);
+      if (session && String(session.userId) !== String(req.user._id)) {
+        session.userId = req.user._id;
+      }
+    }
+
+    if (!session) {
+      return res.status(404).json({
+        ok: false,
+        message: 'Harness session not found. The in-memory database may have reset during a server reload. Please start a new session.',
+      });
     }
 
     let lastEvaluation = null;

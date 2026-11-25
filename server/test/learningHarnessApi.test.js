@@ -4,6 +4,7 @@ import { after, test } from 'node:test';
 
 process.env.NODE_ENV = 'test';
 process.env.MONGODB_URI = '';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-32-chars-length';
 
 const [{ default: app }, { disconnectDB }] = await Promise.all([
   import('../server.js'),

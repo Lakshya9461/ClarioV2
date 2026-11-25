@@ -21,6 +21,7 @@ export const LearningHarness = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isStaleSession, setIsStaleSession] = useState(false);
 
   // Form states for inputs
   const [selectedOption, setSelectedOption] = useState('');
@@ -81,6 +82,23 @@ export const LearningHarness = () => {
     }
   };
 
+  const handleResetSession = () => {
+    setSession(null);
+    setLastFeedback(null);
+    setError('');
+    setIsStaleSession(false);
+    resetFormInputs();
+  };
+
+  const handleApiError = (err, defaultMsg) => {
+    if (err?.status === 404 || err?.message?.includes('not found') || err?.message?.includes('404')) {
+      setError('The learning session was not found on the server (the in-memory database was reset during server reload). Click below to start fresh.');
+      setIsStaleSession(true);
+    } else {
+      setError(err?.message || defaultMsg);
+    }
+  };
+
   const resetFormInputs = () => {
     setSelectedOption('');
     setConfidence(75);
@@ -101,6 +119,7 @@ export const LearningHarness = () => {
 
     setSubmitting(true);
     setError('');
+    setIsStaleSession(false);
     try {
       const res = await harnessApi.respond(session._id, 'probe', {
         selectedOption,
@@ -115,7 +134,7 @@ export const LearningHarness = () => {
         resetFormInputs();
       }
     } catch (err) {
-      setError(err.message || 'Failed to submit probe response.');
+      handleApiError(err, 'Failed to submit probe response.');
     } finally {
       setSubmitting(false);
     }
@@ -124,6 +143,7 @@ export const LearningHarness = () => {
   const handleAcceptPlan = async () => {
     setSubmitting(true);
     setError('');
+    setIsStaleSession(false);
     setLastFeedback(null);
     try {
       const res = await harnessApi.respond(session._id, 'plan_accept', {});
@@ -133,7 +153,7 @@ export const LearningHarness = () => {
         resetFormInputs();
       }
     } catch (err) {
-      setError(err.message || 'Failed to accept lesson plan.');
+      handleApiError(err, 'Failed to accept lesson plan.');
     } finally {
       setSubmitting(false);
     }
@@ -152,6 +172,7 @@ export const LearningHarness = () => {
 
     setSubmitting(true);
     setError('');
+    setIsStaleSession(false);
     try {
       const res = await harnessApi.respond(session._id, 'predict', {
         selectedOption,
@@ -171,7 +192,7 @@ export const LearningHarness = () => {
         });
       }
     } catch (err) {
-      setError(err.message || 'Failed to submit predict response.');
+      handleApiError(err, 'Failed to submit predict response.');
     } finally {
       setSubmitting(false);
     }
@@ -186,6 +207,7 @@ export const LearningHarness = () => {
 
     setSubmitting(true);
     setError('');
+    setIsStaleSession(false);
     try {
       const res = await harnessApi.respond(session._id, 'practice', {
         learnerResponse: practiceAnswer.trim(),
@@ -203,7 +225,7 @@ export const LearningHarness = () => {
         });
       }
     } catch (err) {
-      setError(err.message || 'Failed to submit practice response.');
+      handleApiError(err, 'Failed to submit practice response.');
     } finally {
       setSubmitting(false);
     }
@@ -246,23 +268,31 @@ export const LearningHarness = () => {
           )}
           {session && (
             <button
-              onClick={() => {
-                setSession(null);
-                setLastFeedback(null);
-              }}
-              title="New Session"
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 border border-slate-700/60"
+              onClick={handleResetSession}
+              title="Reset session and start over"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 border border-slate-700/60 text-xs transition-colors"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset</span>
             </button>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
+        <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          {isStaleSession && (
+            <button
+              onClick={handleResetSession}
+              className="px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] shrink-0 self-start sm:self-auto transition-colors"
+            >
+              Start Fresh Session
+            </button>
+          )}
         </div>
       )}
 
