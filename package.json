@@ -1,0 +1,16 @@
+{
+  "name": "clario-workspace",
+  "version": "1.0.0",
+  "description": "Clario — AI-Powered Concept Learning Portal (MERN Stack)",
+  "private": true,
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "seed": "cd server && npm run seed",
+    "test:server": "cd server && npm test",
+    "build:client": "cd client && npm run build"
+  },
+  "keywords": ["mern", "ai", "redis", "sse", "learning-portal"],
+  "author": "Clario Team",
+  "license": "ISC"
+}

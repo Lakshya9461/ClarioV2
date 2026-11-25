@@ -1,0 +1,2094 @@
+// LLM Service for Prompt Refinement, Structured Answer Generation, and Streaming
+// Supports both OpenAI-compatible (/v1/chat/completions) and Anthropic-compatible (/v1/messages) endpoints
+import { detectAndGenerateVisualizationTrace } from './visualizerService.js';
+
+/**
+ * Validates and sanitizes chartData structure
+ */
+export const sanitizeChartData = (chartData) => {
+  if (!chartData || typeof chartData !== 'object') {
+    return null;
+  }
+
+  const { type, labels, values, title, datasetLabel } = chartData;
+
+  const validTypes = ['bar', 'line', 'pie', 'doughnut', 'radar', 'polarArea'];
+  const sanitizedType = validTypes.includes(type) ? type : 'bar';
+
+  if (!Array.isArray(labels) || !Array.isArray(values) || labels.length === 0 || values.length === 0) {
+    return null;
+  }
+
+  const numericValues = values.slice(0, labels.length).map((v) => {
+    const num = Number(v);
+    return isNaN(num) ? 0 : num;
+  });
+
+  const stringLabels = labels.slice(0, numericValues.length).map((l) => String(l));
+
+  return {
+    type: sanitizedType,
+    title: title ? String(title) : 'Comparative Data Analysis',
+    labels: stringLabels,
+    values: numericValues,
+    datasetLabel: datasetLabel ? String(datasetLabel) : 'Metric',
+  };
+};
+
+/**
+ * Validates and sanitizes dynamic AI slides structure
+ */
+export const sanitizeSlides = (slides, rawQuestion = '') => {
+  if (!Array.isArray(slides) || slides.length === 0) {
+    return [];
+  }
+
+  return slides.slice(0, 7).map((slide, index) => {
+    return {
+      slideNumber: slide.slideNumber || index + 1,
+      title: slide.title ? String(slide.title) : `Slide ${index + 1}`,
+      subtitle: slide.subtitle ? String(slide.subtitle) : '',
+      layout: ['hero', 'process', 'deep_dive', 'chart', 'takeaways', 'comparison'].includes(slide.layout)
+        ? slide.layout
+        : 'deep_dive',
+      badge: slide.badge ? String(slide.badge) : '',
+      keyConcept: slide.keyConcept ? String(slide.keyConcept) : '',
+      bulletPoints: Array.isArray(slide.bulletPoints)
+        ? slide.bulletPoints.map((bp) => ({
+            heading: bp.heading ? String(bp.heading) : '',
+            description: bp.description ? String(bp.description) : '',
+            tag: bp.tag ? String(bp.tag) : '',
+          }))
+        : [],
+      processSteps: Array.isArray(slide.processSteps)
+        ? slide.processSteps.map((s) => String(s))
+        : [],
+      codeOrFormula: slide.codeOrFormula ? String(slide.codeOrFormula) : null,
+      callout: slide.callout && typeof slide.callout === 'object'
+        ? {
+            title: slide.callout.title ? String(slide.callout.title) : 'Key Insight',
+            description: slide.callout.description ? String(slide.callout.description) : '',
+            type: ['insight', 'warning', 'tip'].includes(slide.callout.type) ? slide.callout.type : 'insight',
+          }
+        : null,
+    };
+  });
+};
+
+/**
+ * Validates and sanitizes 3-5 search keywords for video search
+ */
+export const sanitizeSearchKeywords = (keywords, fallbackTopic = '') => {
+  if (Array.isArray(keywords) && keywords.length > 0) {
+    const cleaned = keywords
+      .map((k) => (typeof k === 'string' ? k.trim().replace(/^["']|["']$/g, '') : ''))
+      .filter((k) => k.length >= 2)
+      .slice(0, 5);
+    if (cleaned.length >= 2) {
+      return cleaned;
+    }
+  }
+
+  // Fallback to topic extraction
+  if (fallbackTopic) {
+    const clean = fallbackTopic.trim().replace(/[^a-zA-Z0-9\s]/g, ' ').replace(/\s+/g, ' ');
+    if (clean.length > 2) {
+      return [
+        clean,
+        `${clean} explained`,
+        `${clean} tutorial`,
+        `${clean} basics`,
+      ].slice(0, 4);
+    }
+  }
+
+  return ['computer science explained', 'programming concepts', 'software engineering tutorial'];
+};
+
+/**
+ * Safely parse JSON from LLMs, handling raw control characters and unescaped newlines
+ */
+const parseLlmJson = (raw) => {
+  let cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    let inString = false;
+    let escaped = false;
+    let fixed = '';
+    for (let i = 0; i < cleaned.length; i++) {
+      const c = cleaned[i];
+      if (c === '"' && !escaped) {
+        inString = !inString;
+      }
+      if (inString) {
+        if (c === '\n') {
+          fixed += '\\n';
+        } else if (c === '\r') {
+          // ignore
+        } else if (c === '\t') {
+          fixed += '\\t';
+        } else {
+          fixed += c;
+        }
+      } else {
+        fixed += c;
+      }
+      escaped = c === '\\' && !escaped;
+    }
+    return JSON.parse(fixed);
+  }
+};
+
+/**
+ * Universal caller supporting OpenAI-compatible and Anthropic endpoints
+ */
+const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeoutMs = 12000) => {
+  const apiUrl = process.env.LLM_API_URL || 'https://strata.lakshya9461.in/v1';
+  const apiKey = process.env.LLM_API_KEY || '';
+  const model = process.env.LLM_MODEL || 'qwen3.8-flash-next-gyro-gyro-m';
+  const isAnthropic = apiUrl.endsWith('/messages');
+  let targetUrl = apiUrl;
+  if (!isAnthropic && !targetUrl.endsWith('/chat/completions')) {
+    targetUrl = targetUrl.replace(/\/+$/, '') + '/chat/completions';
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  let body;
+  if (isAnthropic) {
+    headers['x-api-key'] = apiKey;
+    headers['anthropic-version'] = '2023-06-01';
+    body = {
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    };
+  } else {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+    body = {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`LLM API returned ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content || data?.content?.[0]?.text || null;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+};
+
+/**
+ * Subject Tag inference heuristic
+ */
+export const inferSubjectTag = (text) => {
+  const t = (text || '').toLowerCase();
+  if (t.match(/code|software|programming|python|algorithm|recursion|tree|graph|database|sql|react|node|javascript|cse|stack|heap|cpu|memory|network|security|crypto|os|compiler|search|sort|\bc\b/)) {
+    return 'computer_science';
+  }
+  if (t.match(/math|calculus|algebra|matrix|probability|statistics|derivative|integral|differential|geometry|theorem|interest|formula/)) {
+    return 'mathematics';
+  }
+  if (t.match(/physics|quantum|thermodynamics|mechanics|optics|gravity|electromagnetism|velocity|force|energy/)) {
+    return 'physics';
+  }
+  if (t.match(/biology|photosynthesis|cell|dna|gene|evolution|organism|protein|enzyme|ecology/)) {
+    return 'biology';
+  }
+  if (t.match(/chemistry|reaction|molecule|bond|acid|base|periodic|organic|inorganic/)) {
+    return 'chemistry';
+  }
+  if (t.match(/economics|finance|gdp|inflation|market|capital|currency|banking/)) {
+    return 'economics';
+  }
+  return 'general_engineering';
+};
+
+/**
+ * Helper to parse clean subject from query string (removes question preamble)
+ */
+const extractCleanTopic = (query) => {
+  return (query || '')
+    .replace(/^(what is the difference between|what are the differences between|difference between|compare|which is better|which is|explain|what is|what are|how does|how do)\s+/i, '')
+    .replace(/[?!.]+$/, '')
+    .trim();
+};
+
+/**
+ * Universal entity extraction for comparison queries
+ * e.g., "which is better linux or windows" -> { entityA: "Linux", entityB: "Windows" }
+ */
+export const parseComparisonEntities = (text) => {
+  if (!text || typeof text !== 'string') return null;
+  const t = text.trim().replace(/[?!.]+$/, '');
+
+  // "which is better X or Y" / "which is faster X or Y"
+  const m1 = t.match(/which(?:\s+is)?(?:\s+(?:better|faster|preferable|superior))?\s+([a-zA-Z0-9#+.\s_-]+?)\s+or\s+([a-zA-Z0-9#+.\s_-]+)/i);
+  if (m1 && m1[1] && m1[2]) {
+    return { entityA: m1[1].trim(), entityB: m1[2].trim() };
+  }
+
+  // "difference between X and Y"
+  const m2 = t.match(/difference\s+between\s+([a-zA-Z0-9#+.\s_-]+?)\s+and\s+([a-zA-Z0-9#+.\s_-]+)/i);
+  if (m2 && m2[1] && m2[2]) {
+    return { entityA: m2[1].trim(), entityB: m2[2].trim() };
+  }
+
+  // "compare X and Y" / "compare X vs Y" / "compare X with Y"
+  const m3 = t.match(/compare\s+([a-zA-Z0-9#+.\s_-]+?)\s+(?:and|to|vs|versus|with)\s+([a-zA-Z0-9#+.\s_-]+)/i);
+  if (m3 && m3[1] && m3[2]) {
+    return { entityA: m3[1].trim(), entityB: m3[2].trim() };
+  }
+
+  // "X vs Y" / "X versus Y"
+  const m4 = t.match(/^([a-zA-Z0-9#+.\s_-]+?)\s+(?:vs|versus)\s+([a-zA-Z0-9#+.\s_-]+)$/i);
+  if (m4 && m4[1] && m4[2]) {
+    return { entityA: m4[1].trim(), entityB: m4[2].trim() };
+  }
+
+  return null;
+};
+
+/**
+ * Helper to detect greetings, pleasantries, and casual conversational remarks
+ * These do NOT warrant a lecture-style PPT slide deck or chart!
+ */
+export const isGreetingOrCasual = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  const cleaned = text
+    .trim()
+    .toLowerCase()
+    .replace(/[!?.,;:'"()]/g, '')
+    .trim();
+
+  const exactGreetings = new Set([
+    'hi',
+    'hello',
+    'hey',
+    'heya',
+    'hola',
+    'yo',
+    'sup',
+    'howdy',
+    'greetings',
+    'good morning',
+    'good afternoon',
+    'good evening',
+    'who are you',
+    'what are you',
+    'what can you do',
+    'how are you',
+    'how are you doing',
+    'how r u',
+    'help',
+    'start',
+    'ping',
+    'test',
+    'thanks',
+    'thank you',
+    'bye',
+    'goodbye',
+  ]);
+
+  if (exactGreetings.has(cleaned)) return true;
+
+  const words = cleaned.split(/\s+/);
+  if (words.length <= 4 && ['hi', 'hello', 'hey', 'heya', 'hola'].includes(words[0])) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Intelligent Knowledge Base with Comprehensive Technical Breakdowns & Dynamic Slide Decks
+ */
+const getKnowledgeBaseAnswer = (question) => {
+  const q = question.toLowerCase();
+
+  // 0. Greetings & Casual Inquiries (Do NOT generate PPT or Chart!)
+  if (isGreetingOrCasual(question)) {
+    return {
+      refinedPrompt: 'User greeting & platform capabilities inquiry',
+      explanation: `### Hello! 👋 Welcome to Clario
+
+I am **Clario**, your AI Computer Science & Engineering learning partner.
+
+When you ask technical concept questions, I can build:
+- 📊 **Interactive Slide Decks** with visual step flows & viva cheat sheets
+- 📄 **Deep Technical Documentation** with code implementations, memory models & complexity
+- 👶 **Intuitive ELI5 Analogies** for understanding difficult abstractions
+- 💬 **ChatGPT-style Follow-up Conversations** where you can ask deeper questions anytime
+
+---
+
+#### 💡 Try asking me any concept:
+- **"What is the difference between C and Python?"**
+- **"Explain recursion and the call stack in memory"**
+- **"Compare Quicksort vs Mergesort (time complexity & stability)"**
+- **"How does Virtual Memory and Page Table work in OS?"**
+- **"Explain Dijkstra's shortest path algorithm with steps"**`,
+      keyPoints: [
+        'Ask technical concept or algorithm questions to generate custom PPT slide decks.',
+        'Explore visual step-by-step process flows and viva checklists.',
+        'Continue any explanation with multi-turn follow-up questions.',
+      ],
+      chartData: null, // NO chart for greetings
+      subjectTag: 'computer_science',
+      searchKeywords: ['computer science basics', 'programming introduction', 'how to learn coding'],
+      slides: [], // ZERO slides: greetings do not create PPTs!
+    };
+  }
+
+  // 1. C vs Python / Comparison
+  if (
+    (q.includes('c') && q.includes('python')) ||
+    (q.includes('difference') && q.includes('c') && q.includes('python'))
+  ) {
+    return {
+      refinedPrompt:
+        'Provide a rigorous comparative technical analysis between C and Python for a B.Tech CSE curriculum. Compare compilation model (native ELF vs bytecode interpreted), type systems (static vs dynamic typing), memory management (manual heap pointers via malloc/free vs automated reference-counted garbage collection), execution performance benchmarks, and real-world systems vs application domains.',
+      explanation: `### Architectural Comparison: C vs Python
+
+**C** and **Python** represent two foundational yet diametrically opposed philosophies in modern computing. C was designed in 1972 at Bell Labs by Dennis Ritchie for systems programming and operating systems; Python was created in 1991 by Guido van Rossum to maximize developer productivity and readability.
+
+| Architectural Dimension | C Programming Language | Python |
+| :--- | :--- | :--- |
+| **Execution Model** | Compiled directly to native machine code (ELF/PE) | Interpreted bytecode on a Virtual Machine (CPython) |
+| **Type System** | Static, weak/explicit typing (enforced at compile-time) | Dynamic, strong duck-typing (enforced at runtime) |
+| **Memory Management** | Manual allocation/deallocation (\`malloc\`, \`free\`) | Automatic garbage collection (Reference Counting + Cyclic GC) |
+| **Performance** | Near-metal speed (Baseline 1.0x execution time) | Slower raw execution (30x–100x slower for CPU-bound loops) |
+| **Concurrency** | Low-level OS threads (POSIX \`pthreads\`) | Global Interpreter Lock (GIL) limits true multi-core CPU threads |
+| **Primary Domains** | OS kernels (Linux), embedded systems, drivers, game engines | AI/ML, data science, web backends, rapid scripting |
+
+#### 1. Compilation vs Interpretation Pipeline
+- **C Compilation Pipeline**: Source \`.c\` ➔ Preprocessor ➔ Compiler (\`gcc\`) ➔ Assembly ➔ Linker ➔ Native Machine Binary. The hardware CPU executes CPU opcodes directly with zero runtime overhead.
+- **Python Pipeline**: Source \`.py\` ➔ Bytecode compiler ➔ \`.pyc\` instructions ➔ Executed sequentially by the **CPython Virtual Machine (PVM)** evaluation loop (\`ceval.c\`).
+
+#### 2. Memory Management & Pointer Arithmetic
+In C, developers manipulate raw virtual memory addresses directly using pointers:
+\`\`\`c
+int *arr = (int *)malloc(5 * sizeof(int)); // Manual heap allocation
+if (arr == NULL) { /* handle out-of-memory */ }
+// ... work with memory ...
+free(arr); // Inviolable rule: must free, else memory leak
+\`\`\`
+In Python, every single primitive is a first-class heap object (\`PyObject\`), tracked by automated reference counting:
+\`\`\`python
+data = [1, 2, 3, 4, 5]  # Python automatically allocates PyListObject and frees it when refcount drops to 0
+\`\`\`
+
+#### 3. When to Choose Which?
+- Use **C** when microsecond latency, deterministic memory usage, or direct hardware access is required.
+- Use **Python** when development velocity, rich library ecosystems (PyTorch, Pandas, FastAPI), and developer ergonomics outweigh raw CPU execution cycles.`,
+      keyPoints: [
+        'C compiles directly to native hardware machine instructions (AOT), whereas Python executes bytecode on a virtual machine (CPython).',
+        'C enforces static compile-time type checking; Python uses dynamic runtime duck typing.',
+        'C requires explicit manual memory management via malloc() and free(); Python uses automated reference counting with cyclic GC.',
+        'C is 30x–100x faster for compute-intensive tasks, while Python provides vastly superior developer velocity and ecosystem breadth.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Execution Time Benchmark (Recursive Fibonacci n=40)',
+        labels: ['C (gcc -O3)', 'C (gcc -O0)', 'PyPy (JIT)', 'Python (CPython 3.12)'],
+        values: [0.38, 1.15, 3.8, 36.4],
+        datasetLabel: 'Execution Time (Seconds - Lower is Faster)',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['c vs python', 'c compilation process', 'python interpreter explained', 'c memory vs python gc'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'C vs Python: The Two Philosophies of Computing',
+          subtitle: 'Low-level hardware control vs high-level developer velocity',
+          layout: 'hero',
+          badge: 'Foundational Taxonomy',
+          keyConcept: 'C maximizes hardware efficiency by talking directly to the CPU; Python maximizes human efficiency by abstracting memory and syntax.',
+          bulletPoints: [
+            {
+              heading: 'C Philosophy',
+              description: 'Minimal abstraction, manual memory control, zero runtime overhead. Designed for writing operating systems.',
+              tag: 'Systems',
+            },
+            {
+              heading: 'Python Philosophy',
+              description: '"Batteries included", rapid iteration, clean readable syntax. Designed to minimize developer friction.',
+              tag: 'Application',
+            },
+            {
+              heading: 'The Trade-off Matrix',
+              description: '10x faster developer velocity in Python vs 50x–100x faster CPU execution speed in C.',
+              tag: 'Trade-off',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Synergy Insight',
+            description: 'They often work together: performance-critical Python libraries (NumPy, PyTorch, TensorFlow) are written in C under the hood.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'The Execution Pipeline: Native ELF vs Virtual Machine Bytecode',
+          subtitle: 'Tracing how program instructions reach the silicon CPU',
+          layout: 'process',
+          badge: 'Compilation Model',
+          keyConcept: 'C compiles Ahead-of-Time (AOT) to native machine opcodes; Python compiles to bytecode interpreted by a C-based VM loop.',
+          bulletPoints: [
+            {
+              heading: 'C Ahead-of-Time (AOT)',
+              description: 'Source code compiles directly to native binary opcodes for the target CPU architecture.',
+              tag: 'Bare Metal',
+            },
+            {
+              heading: 'Python Virtual Machine (PVM)',
+              description: 'Source translates into bytecode (.pyc) executed instruction-by-instruction by CPython.',
+              tag: 'Bytecode VM',
+            },
+            {
+              heading: 'Global Interpreter Lock (GIL)',
+              description: 'CPython uses a mutex (GIL) to protect reference counters, restricting CPU multi-threading in pure Python.',
+              tag: 'Concurrency',
+            },
+          ],
+          processSteps: [
+            'C: .c Source ➔ Preprocessor ➔ gcc Compiler ➔ Assembler ➔ Linker ➔ Native Binary',
+            'Python: .py Source ➔ Bytecode Parser ➔ .pyc Bytecode ➔ CPython ceval.c Loop',
+            'Execution: C runs directly on silicon CPU; Python runs inside a host C process',
+          ],
+          codeOrFormula: '// C: Compiles to standalone native binary\ngcc -O3 main.c -o app\n\n# Python: Interpreted by CPython VM\npython3 main.py',
+          callout: {
+            title: 'Did You Know?',
+            description: 'CPython is itself written in C! When you launch Python, an underlying C program compiles and executes your Python script.',
+            type: 'tip',
+          },
+        },
+        {
+          slideNumber: 3,
+          title: 'Memory Architecture: Raw Pointers vs Reference-Counted GC',
+          subtitle: 'Comparing manual heap allocation against automated garbage collection',
+          layout: 'deep_dive',
+          badge: 'Memory & Safety',
+          keyConcept: 'C exposes raw memory addresses through pointers; Python wraps every primitive in a 24+ byte PyObject structure.',
+          bulletPoints: [
+            {
+              heading: 'C Heap Management',
+              description: 'Explicit malloc() and free(). Forgetting to free causes leaks; freeing twice causes fatal heap corruption.',
+              tag: 'Manual',
+            },
+            {
+              heading: 'Python Automatic GC',
+              description: 'Reference counting increments/decrements on assignment. When refcount hits 0, memory is recycled immediately.',
+              tag: 'Automatic',
+            },
+            {
+              heading: 'Memory Safety',
+              description: 'C code is vulnerable to buffer overflows, dangling pointers, and segfaults. Python provides managed memory safety.',
+              tag: 'Safety',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: '// C: Manual Memory Allocation\nint *arr = (int *)malloc(100 * sizeof(int));\nfree(arr); // Inviolable rule\n\n# Python: Automated PyObject\narr = [0] * 100  # Automatically freed',
+          callout: {
+            title: 'Security Implication',
+            description: 'Over 70% of major software vulnerabilities in operating systems stem from memory safety bugs in C/C++.',
+            type: 'warning',
+          },
+        },
+        {
+          slideNumber: 4,
+          title: 'Empirical Performance Benchmark: CPU Execution Time',
+          subtitle: 'Benchmarking raw computational speed across compute-heavy algorithms',
+          layout: 'chart',
+          badge: 'Empirical Benchmark',
+          keyConcept: 'In CPU-bound loops (such as recursive Fibonacci n=40), C runs roughly 95x faster than standard CPython.',
+          bulletPoints: [
+            {
+              heading: 'Zero Runtime Overhead',
+              description: 'C compiler aggressively inlines functions, unrolls loops, and maps variables directly to CPU hardware registers.',
+              tag: 'C Speed',
+            },
+            {
+              heading: 'Dynamic Dispatch Cost',
+              description: 'Python performs dictionary lookups and type checks for every operator evaluation at runtime.',
+              tag: 'Python Cost',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Benchmark Conclusion',
+            description: 'Notice the chart below: C completes in 0.38 seconds, while standard CPython takes 36.4 seconds for the identical calculation.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 5,
+          title: 'Exam Cheat Sheet: Viva Voce Comparison Matrix',
+          subtitle: 'High-yield oral exam questions professors and interviewers always ask',
+          layout: 'takeaways',
+          badge: 'Exam Revision',
+          keyConcept: 'Master these 4 core differentiators cold for full marks on C vs Python viva questions.',
+          bulletPoints: [
+            {
+              heading: 'Q1: Why is Python slower than C?',
+              description: 'Dynamic type checking at runtime, bytecode interpretation overhead, and PyObject boxing for all data.',
+              tag: 'High Yield',
+            },
+            {
+              heading: 'Q2: What is the Python GIL?',
+              description: 'Global Interpreter Lock prevents multiple native threads from executing Python bytecodes simultaneously in CPython.',
+              tag: 'Concurrency',
+            },
+            {
+              heading: 'Q3: How does Python achieve high performance in ML?',
+              description: 'Libraries like NumPy and PyTorch write their computational cores in C/CUDA and expose Python wrappers.',
+              tag: 'Optimization',
+            },
+            {
+              heading: 'Q4: When MUST you choose C over Python?',
+              description: 'Operating system kernels, embedded microcontrollers, real-time audio/graphics engines, and device drivers.',
+              tag: 'Use Cases',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Viva Golden Rule',
+            description: 'State: "C is compiled, statically typed, and manually managed; Python is interpreted, dynamically typed, and garbage collected."',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 2. Recursion
+  if (q.includes('recursion') || q.includes('recursive')) {
+    return {
+      refinedPrompt:
+        'Explain the fundamental concept of recursion in computer science for a B.Tech CSE student. Cover the base case vs recursive step, call stack mechanics, space-time complexity analysis, risk of stack overflow, and provide a visual comparative chart showing call stack depth across input sizes.',
+      explanation:
+        '### Understanding Recursion\n\nRecursion is a computational paradigm where a function solves a problem by calling a copy of itself to solve smaller subproblems of identical structure. Every recursive algorithm relies on two indispensable pillars:\n\n1. **The Base Case**: A terminating condition that returns a concrete value directly without spawning further recursive calls, preventing infinite descent.\n2. **The Recursive Step**: The induction step where the function reduces the problem instance and invokes itself with simpler parameters.\n\n#### The Call Stack in Memory\nEach recursive invocation pushes a new **Stack Frame** onto the program call stack. This frame stores local variables, parameter bindings, and the return address. When the base case is reached, the stack frames unwind in Last-In, First-Out (LIFO) order, returning accumulated results back to callers.\n\n```python\ndef factorial(n):\n    if n <= 1:           # Base Case\n        return 1\n    return n * factorial(n - 1)  # Recursive Step\n```\n\n#### Complexity & Stack Overflow\nIf the recursion depth exceeds the compiler stack limit (commonly 1,000 to 10,000 frames), a `StackOverflowError` occurs. Tail-call optimization (TCO) and memoization are common engineering solutions.',
+      keyPoints: [
+        'A valid recursive function must always have at least one reachable base case.',
+        'Each recursion level allocates a separate stack frame in memory.',
+        'Unbounded recursive calls exhaust stack memory, causing stack overflow crashes.',
+        'Recursive algorithms can often be transformed into iterative ones using an explicit stack or dynamic programming.',
+      ],
+      chartData: {
+        type: 'line',
+        title: 'Call Stack Depth vs Input Size (n)',
+        labels: ['n=1', 'n=5', 'n=10', 'n=20', 'n=50', 'n=100'],
+        values: [1, 5, 10, 20, 50, 100],
+        datasetLabel: 'Stack Frames Allocated',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['c vs python', 'c compilation process', 'python interpreter explained', 'c memory vs python gc'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Understanding Recursion: The Divide-and-Conquer Paradigm',
+          subtitle: 'Why solve a complex problem all at once when you can solve a smaller copy?',
+          layout: 'hero',
+          badge: 'Core Intuition',
+          keyConcept: 'Recursion is self-referential problem reduction: break down input until you hit a trivial, pre-solved case.',
+          bulletPoints: [
+            {
+              heading: 'Russian Doll Principle',
+              description: 'Open larger doll to reveal identical smaller doll, repeating until the smallest solid doll is reached.',
+              tag: 'Analogy',
+            },
+            {
+              heading: 'The Two Inviolable Laws',
+              description: 'Law 1: Must have a Base Case. Law 2: Each recursive step must strictly move closer to that Base Case.',
+              tag: 'Rule',
+            },
+            {
+              heading: 'Memory Trade-off',
+              description: 'Trading clean mathematical elegance for linear call stack space consumption in RAM.',
+              tag: 'Architecture',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Foundational Truth',
+            description: 'Any problem that can be solved recursively can also be solved iteratively using an explicit stack.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'The Execution Mechanics: Stack Frames in RAM',
+          subtitle: 'Step-by-step trace of how the OS call stack allocates and unwinds recursive invocations',
+          layout: 'process',
+          badge: 'Memory Architecture',
+          keyConcept: 'Every invocation pushes a fresh stack frame (parameters + local variables + return pointer) onto the thread stack.',
+          bulletPoints: [
+            {
+              heading: 'Push Phase (Descent)',
+              description: 'factorial(3) pushes frame -> pauses -> calls factorial(2) -> pushes frame -> calls factorial(1).',
+              tag: 'Push',
+            },
+            {
+              heading: 'Base Case Hit',
+              description: 'factorial(1) evaluates n <= 1, returns literal 1 without generating any further calls.',
+              tag: 'Terminal',
+            },
+            {
+              heading: 'Pop Phase (Unwinding)',
+              description: 'Frames resolve in LIFO order: 1 * 2 = 2 returned to caller, then 2 * 3 = 6 returned as final answer.',
+              tag: 'Pop (LIFO)',
+            },
+          ],
+          processSteps: [
+            'Caller invokes factorial(3) [Frame 1 created]',
+            'factorial(3) calls factorial(2) [Frame 2 pushed]',
+            'factorial(2) calls factorial(1) [Frame 3 pushed]',
+            'Base Case reached: returns 1 [Frame 3 popped]',
+            'factorial(2) computes 2 * 1 = 2 [Frame 2 popped]',
+            'factorial(3) computes 3 * 2 = 6 [Final return]',
+          ],
+          codeOrFormula: 'def factorial(n):\n    if n <= 1: return 1\n    return n * factorial(n - 1)',
+          callout: {
+            title: 'LIFO Execution Order',
+            description: 'Last-In, First-Out: The deepest function call is the very first one to finish executing and pop.',
+            type: 'tip',
+          },
+        },
+        {
+          slideNumber: 3,
+          title: 'Complexity & The Stack Overflow Danger Zone',
+          subtitle: 'Theoretical bounds, recursive overhead, and defense mechanisms in production',
+          layout: 'deep_dive',
+          badge: 'Performance & Risk',
+          keyConcept: 'Without tail-call optimization or bounding, recursion consumes O(N) auxiliary space, risking fatal process crashes.',
+          bulletPoints: [
+            {
+              heading: 'Time Complexity',
+              description: 'For factorial/linear recursion: O(N) operations. For Fibonacci without memoization: devastating O(2^N).',
+              tag: 'Time: O(N)',
+            },
+            {
+              heading: 'Space Complexity',
+              description: 'O(N) memory consumed exclusively by stack frames (8MB default stack on Linux typically overflows around 10k frames).',
+              tag: 'Space: O(N)',
+            },
+            {
+              heading: 'Production Defenses',
+              description: 'Tail Call Optimization (TCO), memoization tables, or rewriting with an explicit while-loop + vector.',
+              tag: 'Mitigation',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: 'Recursion Depth Limit (Python): sys.getrecursionlimit() -> 1000\nLinux Stack Size Limit: ulimit -s -> 8192 KB',
+          callout: {
+            title: 'Fatal Bug: Infinite Recursion',
+            description: 'Missing or unreachable base case guarantees SIGSEGV / RecursionError as stack frames collide with the heap.',
+            type: 'warning',
+          },
+        },
+        {
+          slideNumber: 4,
+          title: 'Empirical Stack Depth Scaling',
+          subtitle: 'Visual metric analysis showing linear call stack growth proportional to input size n',
+          layout: 'chart',
+          badge: 'Empirical Benchmark',
+          keyConcept: 'Memory footprint grows linearly with input magnitude, proving the O(N) auxiliary space constraint.',
+          bulletPoints: [
+            {
+              heading: 'Strict Linear Growth',
+              description: 'Each unit increment of input n forces exactly one additional 48-byte stack frame allocation.',
+              tag: 'Linear',
+            },
+            {
+              heading: 'Benchmarking Takeaway',
+              description: 'Always prefer tree/graph recursion (depth O(log N)) over linear chains when processing deep datasets.',
+              tag: 'Guideline',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Visual Proof',
+            description: 'Notice the linear 45-degree slope in the chart below: stack frames scale 1:1 with input depth.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 5,
+          title: 'Exam Cheat Sheet: High-Yield Viva Questions',
+          subtitle: 'What professors and interviewers always ask about recursion',
+          layout: 'takeaways',
+          badge: 'Exam Revision',
+          keyConcept: 'Master these 4 core concepts for full viva marks on recursion questions.',
+          bulletPoints: [
+            {
+              heading: 'Q1: What happens if base case is omitted?',
+              description: 'Infinite calls occur until compiler stack space is exhausted, raising StackOverflowError.',
+              tag: 'High Yield',
+            },
+            {
+              heading: 'Q2: How does Tail Recursion optimize memory?',
+              description: 'When recursive call is the final action, the compiler reuses the current stack frame in-place (O(1) space).',
+              tag: 'Optimization',
+            },
+            {
+              heading: 'Q3: Recursion vs Iteration trade-off?',
+              description: 'Recursion is more readable and matches inductive data structures (trees/graphs); iteration is faster and O(1) space.',
+              tag: 'Trade-off',
+            },
+            {
+              heading: 'Q4: How do you prevent overlapping subproblems?',
+              description: 'Apply Memoization (caching return values in a hash table) or bottom-up Tabulation (Dynamic Programming).',
+              tag: 'Dynamic Prog',
+            },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Viva Rule of Thumb',
+            description: 'Always state the Base Case condition FIRST in any viva coding question before writing logic.',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 3. Quicksort vs Mergesort / Sorting
+  if (q.includes('quicksort') || q.includes('mergesort') || q.includes('sort')) {
+    return {
+      refinedPrompt:
+        'Provide a rigorous algorithmic comparison between Quicksort and Mergesort for B.Tech CSE students. Analyze partitioning vs merging, worst-case vs average-case time complexity, in-place auxiliary space requirements, algorithmic stability, and cache locality performance on modern CPUs.',
+      explanation: `### Algorithmic Comparison: Quicksort vs Mergesort
+
+Both **Quicksort** and **Mergesort** are classical **Divide-and-Conquer** comparison sorting algorithms, but they divide and conquer in completely opposite phases.
+
+| Parameter | Quicksort | Mergesort |
+| :--- | :--- | :--- |
+| **Best / Average Time** | O(N log N) | O(N log N) |
+| **Worst-Case Time** | **O(N²)** (poor pivot choice) | **O(N log N)** (guaranteed) |
+| **Auxiliary Space** | **O(log N)** (In-place call stack) | **O(N)** (Requires auxiliary buffer) |
+| **Algorithmic Stability** | Unstable (by default) | **Stable** (preserves equal keys) |
+| **Cache Locality** | Excellent (sequential cache lines) | Poor (copies between buffers) |
+| **Preferred Domain** | In-memory arrays, systems programming | Linked lists, external disk sorting |
+
+#### 1. Core Algorithmic Mechanics
+- **Quicksort**: Does the heavy work in the **divide** phase. Selects a pivot element and partitions the array such that all elements $\\le$ pivot are to the left, and elements $>$ pivot are to the right. Recursively sorts sub-arrays.
+- **Mergesort**: Does the heavy work in the **combine** phase. Arbitrarily divides array at the midpoint $N/2$ with zero comparison work, recursively sorts both halves, and then performs a linear $O(N)$ merge pass.`,
+      keyPoints: [
+        'Quicksort sorts in-place with O(log N) stack space; Mergesort requires O(N) auxiliary memory for buffer merging.',
+        'Mergesort guarantees O(N log N) worst-case time; Quicksort degrades to O(N²) when encountering adversarial pivots.',
+        'Mergesort is stable; standard Quicksort is unstable.',
+        'Quicksort exhibits superior CPU hardware cache locality in practical real-world benchmarks.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Sorting Operations Benchmark (Array Size N=100,000)',
+        labels: ['Quicksort (Random)', 'Quicksort (Worst Case)', 'Mergesort (Any Case)', 'Heap Sort'],
+        values: [1400000, 5000000000, 1600000, 1900000],
+        datasetLabel: 'Comparison Operations Count',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['quicksort vs mergesort', 'quicksort partitioning', 'merge sort step by step', 'sorting algorithm time complexity'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Quicksort vs Mergesort: The Divide-and-Conquer Duel',
+          subtitle: 'Partition-first vs Merge-last: Two opposing computational approaches',
+          layout: 'hero',
+          badge: 'Algorithmic Paradigm',
+          keyConcept: 'Quicksort does heavy work during the partition phase; Mergesort does heavy work during the merge phase.',
+          bulletPoints: [
+            { heading: 'Quicksort Strategy', description: 'Pick pivot, partition in-place, recurse left and right. Zero merge cost.', tag: 'Partition' },
+            { heading: 'Mergesort Strategy', description: 'Split at midpoint trivially, recurse, then merge two sorted halves. O(N) merge cost.', tag: 'Merge' },
+            { heading: 'Practical Winner', description: 'Quicksort is 2-3x faster in real hardware memory due to sequential CPU cache locality.', tag: 'Cache' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Space vs Guarantee',
+            description: 'Quicksort trades worst-case safety for O(1) space; Mergesort trades O(N) memory for guaranteed O(N log N) speed.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'Algorithmic Execution Pipelines',
+          subtitle: 'Step-by-step partition trace vs split-and-merge trace',
+          layout: 'process',
+          badge: 'Execution Trace',
+          keyConcept: 'Tracing Lomuto/Hoare partition steps vs two-pointer merge merging.',
+          bulletPoints: [
+            { heading: 'Hoare Partition', description: 'Two pointers move toward each other, swapping out-of-order elements around pivot.', tag: 'In-Place' },
+            { heading: 'Two-Way Merge', description: 'Compare heads of two sorted sub-lists, copying the smaller element into output buffer.', tag: 'Stable' },
+          ],
+          processSteps: [
+            'Quicksort: Select pivot ➔ Partition array into [<= pivot] and [> pivot] ➔ Recurse',
+            'Mergesort: Find mid = (L+R)/2 ➔ Sort(L..mid) ➔ Sort(mid+1..R) ➔ Merge(L, mid, R)',
+          ],
+          codeOrFormula: '// Quicksort Partition:\nwhile (A[i] < pivot) i++;\nwhile (A[j] > pivot) j--;\nswap(A[i], A[j]);',
+          callout: {
+            title: 'Stability Invariant',
+            description: 'Mergesort is naturally STABLE (preserves equal items order). Quicksort pointer swaps break original order.',
+            type: 'tip',
+          },
+        },
+        {
+          slideNumber: 3,
+          title: 'Big-O Space & Time Complexity Bounds',
+          subtitle: 'Best, average, and pathological worst-case behaviors',
+          layout: 'deep_dive',
+          badge: 'Complexity Analysis',
+          keyConcept: 'Quicksort suffers O(N²) on sorted arrays with naive pivot; modern implementations use Dual-Pivot or Median-of-Three.',
+          bulletPoints: [
+            { heading: 'Time Bounds', description: 'Mergesort: Always O(N log N). Quicksort: Avg O(N log N), Worst O(N²).', tag: 'Time' },
+            { heading: 'Space Bounds', description: 'Mergesort: O(N) buffer. Quicksort: O(log N) stack memory.', tag: 'Space' },
+          ],
+          processSteps: [],
+          codeOrFormula: 'Mergesort Recurrence: T(N) = 2T(N/2) + O(N) -> O(N log N)\nQuicksort Worst Case: T(N) = T(N-1) + O(N) -> O(N^2)',
+          callout: {
+            title: 'Adversarial Worst Case',
+            description: 'Selecting the first/last element on an already sorted array yields O(N²) recursion depth.',
+            type: 'warning',
+          },
+        },
+        {
+          slideNumber: 4,
+          title: 'Empirical Operations Scaling',
+          subtitle: 'Measured operation counts across array size N=100,000',
+          layout: 'chart',
+          badge: 'Benchmark',
+          keyConcept: 'Notice the astronomical spike when Quicksort hits worst-case partitioning.',
+          bulletPoints: [
+            { heading: 'Random Array Efficiency', description: 'Quicksort performs fewer overall memory write operations than Mergesort.', tag: 'Efficiency' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Why C qsort uses Quicksort',
+            description: 'Standard library implementations prefer Quicksort or Introsort because cache hits outweigh theoretical worst-cases.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 5,
+          title: 'Exam Cheat Sheet: Viva Sorting Matrix',
+          subtitle: 'Oral examination checklist for sorting algorithms',
+          layout: 'takeaways',
+          badge: 'Viva Prep',
+          keyConcept: 'The 4 questions examiners ask in algorithm viva examinations.',
+          bulletPoints: [
+            { heading: 'Why not always Mergesort?', description: 'O(N) memory allocation overhead and poor CPU cache locality make it slower in RAM.', tag: 'Viva Q1' },
+            { heading: 'Why is Mergesort used for Linked Lists?', description: 'Nodes can be merged by re-pointing pointers without allocating O(N) extra buffers.', tag: 'Viva Q2' },
+            { heading: 'What is Introsort?', description: 'Starts with Quicksort, switches to Heapsort if recursion depth exceeds 2 log N to eliminate O(N²).', tag: 'Viva Q3' },
+            { heading: 'What is Timsort?', description: 'Hybrid of Mergesort and Insertion Sort used in Python (list.sort) and Java (Arrays.sort).', tag: 'Viva Q4' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Viva Summary',
+            description: 'Mergesort for stability and guaranteed O(N log N); Quicksort for speed, in-place memory, and cache efficiency.',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 4. Linux vs Windows / Operating Systems
+  if (
+    (q.includes('linux') && q.includes('windows')) ||
+    (q.includes('os') && (q.includes('linux') || q.includes('windows')))
+  ) {
+    return {
+      refinedPrompt:
+        'Provide an in-depth operating systems comparative analysis between Linux and Microsoft Windows for B.Tech CSE students. Compare kernel architecture (Monolithic with loadable kernel modules vs Hybrid NT Microkernel), file system hierarchy (single unified root ext4 vs drive letters NTFS), process creation overhead (fork/clone with Copy-on-Write vs CreateProcess), server performance, and developer containerization ecosystem.',
+      explanation: `### Architectural Analysis: Linux vs Microsoft Windows
+      
+The comparison between **Linux** and **Windows** represents a contrast between **Unix-philosophy open modularity** and an **integrated commercial desktop ecosystem**. Neither is universally "better"—the optimal choice depends strictly on whether your workload is **cloud/server infrastructure** or **desktop consumer productivity**.
+
+| Architectural Dimension | Linux OS | Microsoft Windows |
+| :--- | :--- | :--- |
+| **Kernel Architecture** | Monolithic kernel (loadable kernel modules) | Hybrid microkernel (NT Kernel) |
+| **File System Hierarchy** | Single unified root tree (\`/\`), case-sensitive (ext4, btrfs, ZFS) | Drive letter system (\`C:\\\`, \`D:\\\`), case-insensitive (NTFS) |
+| **Resource Overhead** | Extremely lightweight (minimal server ~150-300MB RAM) | Heavier baseline footprint (idle desktop 2-4GB RAM) |
+| **Process Model** | Lightweight \`fork()\` and \`clone()\` system calls with Copy-on-Write (CoW) | Heavyweight \`CreateProcess()\` API |
+| **Package Management** | Native centralized managers (\`apt\`, \`pacman\`, \`dnf\`) | Historically manual \`.exe\`/\`.msi\` (now \`winget\`) |
+| **Hardware Control & CLI** | Full root shell (\`bash\`, \`zsh\`), systemd, cron, ssh | GUI-first, PowerShell, Windows Terminal |
+| **Dominant Domain** | 96%+ of cloud servers, supercomputers, Android, Docker/K8s | Enterprise desktops (Active Directory), Office, DirectX PC gaming |
+
+#### 1. Kernel Architecture: Monolithic vs Hybrid
+- **Linux Monolithic Kernel**: Core subsystems (scheduler, virtual memory, network stack, VFS, drivers) run in privileged **Kernel Space (Ring 0)**. Subsystems invoke each other directly via C function pointers, maximizing I/O bandwidth and packet throughput.
+- **Windows NT Hybrid Kernel**: Combines microkernel abstraction with executive subsystem speed. Isolates drivers with the Hardware Abstraction Layer (\`HAL\`), offering resilience against faulty third-party graphics drivers at the cost of slight IPC message-passing overhead.
+
+#### 2. Native Containerization vs Virtualization
+- **Linux**: Docker containers run natively using kernel **Control Groups (\`cgroups\`)** and **Namespaces**. Containers are simply isolated host processes with zero virtualization overhead.
+- **Windows**: To run Linux containers, Windows must virtualize a lightweight Linux kernel utility VM using **Hyper-V / WSL2** (Windows Subsystem for Linux).`,
+      keyPoints: [
+        'Linux uses a monolithic kernel with a single unified ext4/btrfs root; Windows uses a hybrid NT kernel with NTFS and drive letters.',
+        'Docker and Kubernetes run natively on Linux kernel cgroups and namespaces with zero hypervisor penalty.',
+        'Linux dominates 96%+ of cloud servers and top 500 supercomputers; Windows dominates enterprise corporate workstations and PC gaming.',
+        'WSL2 provides a native Linux kernel running seamlessly alongside the Windows desktop environment.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Global Operating System Market Share by Workload (%)',
+        labels: ['Public Cloud Servers (Linux)', 'Supercomputers (Linux)', 'Consumer Desktops (Windows)', 'Consumer Desktops (Linux)'],
+        values: [96, 100, 72, 4],
+        datasetLabel: 'Adoption Rate (%)',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['linux vs windows', 'operating systems architecture', 'monolithic kernel vs hybrid kernel', 'linux for developers'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Linux vs Windows: Two Divergent OS Philosophies',
+          subtitle: 'Unix modularity and open server control vs integrated commercial desktop ecosystem',
+          layout: 'hero',
+          badge: 'Operating Systems',
+          keyConcept: 'Linux is built for headless server automation and developer control; Windows is built for unified desktop ergonomics and enterprise IT.',
+          bulletPoints: [
+            { heading: 'Unix Legacy', description: 'Everything is a file, modular CLI tools connected via standard I/O pipes.', tag: 'Philosophy' },
+            { heading: 'NT Architecture', description: 'Centralized registry, COM object model, rich GUI, and backward binary compatibility.', tag: 'Architecture' },
+            { heading: 'Market Reality', description: 'Linux owns the cloud backends and supercomputers; Windows owns corporate desktops.', tag: 'Ecosystem' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Core Distinction',
+            description: 'Linux treats processes and text streams as primitives; Windows treats GUI windows and security tokens as primitives.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'Process Creation: fork() + execve() vs CreateProcess()',
+          subtitle: 'Comparing process spawning mechanics and memory duplication overhead',
+          layout: 'process',
+          badge: 'Kernel Mechanics',
+          keyConcept: 'Linux fork() uses Copy-on-Write (CoW) to spawn processes in sub-milliseconds without copying memory pages.',
+          bulletPoints: [
+            { heading: 'Copy-on-Write', description: 'Child shares parent page tables until either process writes to a page.', tag: 'Memory' },
+            { heading: 'Win32 Process Creation', description: 'CreateProcess() constructs tokens, handles, security descriptors, and PE loader mappings.', tag: 'Win32' },
+          ],
+          processSteps: [
+            'Linux: fork() clones page tables with CoW ➔ child inherits file descriptors ➔ execve() swaps binary image',
+            'Windows: CreateProcess() opens file ➔ creates kernel executive process object ➔ creates initial thread ➔ notifies Win32 subsystem',
+          ],
+          codeOrFormula: '// Linux process fork:\npid_t pid = fork();\nif (pid == 0) {\n    execve("/bin/ls", NULL, NULL);\n}',
+          callout: {
+            title: 'Performance Implication',
+            description: 'Linux process spawning is 5-10x faster than Windows, making multi-process microservices highly efficient.',
+            type: 'tip',
+          },
+        },
+        {
+          slideNumber: 3,
+          title: 'File System Hierarchy & Disk Organization',
+          subtitle: 'Unified VFS hierarchy vs Drive Letter Partitions',
+          layout: 'deep_dive',
+          badge: 'Storage Architecture',
+          keyConcept: 'Linux mounts all physical and virtual devices under a single unified root (/); Windows assigns drive letters (C:\\, D:\\).',
+          bulletPoints: [
+            { heading: 'Linux POSIX Model', description: 'ext4 / btrfs / XFS case-sensitive tree. Virtual file systems like /proc and /sys expose kernel state.', tag: 'VFS' },
+            { heading: 'Windows NTFS Model', description: 'Access Control Lists (ACLs), alternate data streams, case-insensitive paths, and drive volume mount points.', tag: 'NTFS' },
+          ],
+          processSteps: [],
+          codeOrFormula: 'Linux: /var/log/nginx/access.log (Case Sensitive)\nWindows: C:\\Windows\\System32\\drivers (Case Insensitive)',
+          callout: {
+            title: 'Case-Sensitivity Invariant',
+            description: 'In Linux, "File.txt" and "file.txt" are two distinct files. In Windows NTFS, they refer to the same inode.',
+            type: 'warning',
+          },
+        },
+        {
+          slideNumber: 4,
+          title: 'Empirical Adoption by Computing Domain',
+          subtitle: 'Market dominance across cloud servers vs enterprise desktops',
+          layout: 'chart',
+          badge: 'Empirical Market',
+          keyConcept: 'Notice the complete inversion: Linux owns 96%+ of cloud infrastructure, while Windows dominates desktops.',
+          bulletPoints: [
+            { heading: 'Server Infrastructure', description: 'Hyperscalers (AWS, GCP, Azure) run primarily on customized Linux kernels.', tag: 'Cloud' },
+            { heading: 'Desktop Enterprise', description: 'Active Directory and Office 365 maintain Windows desktop dominance.', tag: 'Enterprise' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Engineering Truth',
+            description: 'Engineers write code on Windows/Mac desktops, but deploy and run that code on Linux production servers.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 5,
+          title: 'Exam Cheat Sheet: Operating Systems Viva',
+          subtitle: 'Crucial oral examination questions on Linux vs Windows',
+          layout: 'takeaways',
+          badge: 'Viva Voce',
+          keyConcept: 'The 4 questions university examiners ask about operating system kernels.',
+          bulletPoints: [
+            { heading: 'Monolithic vs Microkernel?', description: 'Linux is monolithic with loadable kernel modules; Windows NT is a hybrid microkernel with Executive layers.', tag: 'Viva Q1' },
+            { heading: 'Why is Linux preferred for Cloud?', description: 'Lightweight headless memory footprint, native cgroups/namespaces for Docker, and scriptable text configuration.', tag: 'Viva Q2' },
+            { heading: 'How does Docker work on Windows?', description: 'Requires WSL2 running a virtualized Linux utility VM inside Hyper-V.', tag: 'Viva Q3' },
+            { heading: 'What is Copy-on-Write (CoW)?', description: 'fork() shares memory pages between parent and child until a write operation triggers a page duplicate.', tag: 'Viva Q4' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Viva Golden Rule',
+            description: 'Never claim one is "better"; state their design goals: Linux for headless server throughput; Windows for rich interactive desktop integration.',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 5. Linux Distributions for Gaming / Linux Gaming
+  if (
+    q.includes('distro') ||
+    q.includes('distros') ||
+    (q.includes('linux') && (q.includes('gaming') || q.includes('game') || q.includes('games') || q.includes('steam') || q.includes('best'))) ||
+    q.includes('nobara') ||
+    q.includes('bazzite') ||
+    q.includes('steamos') ||
+    q.includes('pop os') ||
+    q.includes('pop_os') ||
+    q.includes('pop!_os')
+  ) {
+    return {
+      refinedPrompt:
+        'Provide an in-depth systems engineering and comparative evaluation of the best Linux distributions for gaming (Nobara, Bazzite, SteamOS, Pop!_OS, Arch Linux). Detail the graphics translation pipeline (Wine, Proton, DXVK, VKD3D-Proton), custom low-latency kernel scheduler patches (fsync, futex2, EEVDF, BORE), display server protocols (Wayland with Gamescope HDR vs X11), driver management (Mesa RADV vs NVIDIA proprietary DKMS), and hardware compatibility benchmarks.',
+      explanation: `### Comprehensive Systems Analysis: The Best Linux Distros for Gaming
+
+In modern computer engineering, Linux gaming has undergone an architectural transformation. What used to require complex manual Wine prefixes is now a streamlined, high-performance ecosystem powered by **Valve Proton**, **Vulkan API translation**, and **custom low-latency kernel schedulers**. For most AAA titles, Linux gaming matches or even exceeds native Windows 11 performance by eliminating background OS telemetry and disk bloat.
+
+| Gaming Distribution | Upstream Base | Target Use Case & Hardware | Custom Kernel & Scheduler | Graphics & Driver Stack |
+| :--- | :--- | :--- | :--- | :--- |
+| **Nobara Linux** | Fedora | Desktop PCs (AMD, NVIDIA, Intel) | Patched kernel (\`fsync\`, \`futex2\`, zen/bore scheduler) | Automated NVIDIA driver install, pre-configured Mesa, GStreamer codecs |
+| **Bazzite** | Fedora Silverblue | Handhelds (Steam Deck, ROG Ally) & HTPCs | Custom gaming kernel with auto-rollback | Immutable atomic filesystem, Steam Gamepad UI (Gamescope session) |
+| **Pop!_OS** | Ubuntu (System76) | Laptops with Hybrid GPUs & Beginners | System76 tuned kernel | Dedicated NVIDIA ISO, automatic discrete/integrated GPU power switching |
+| **Arch Linux / EndeavourOS** | Independent Rolling | Enthusiasts & Advanced Builders | Optional \`linux-zen\` or \`linux-tkg\` kernels | Bleeding-edge Mesa Vulkan drivers, Arch User Repository (AUR) |
+
+---
+
+#### 1. The Direct3D to Vulkan Execution Pipeline
+When a Windows game runs on Linux, it executes through a multi-tier runtime abstraction layer without code emulation:
+1. **Application Call**: The Windows binary (\`.exe\`) invokes DirectX 11 or DirectX 12 graphics APIs.
+2. **Win32 Translation (WINE / Proton)**: Win32 system calls (file I/O, audio, input, window management) are mapped directly into native POSIX system calls.
+3. **API Translation (DXVK & VKD3D-Proton)**:
+   - **DXVK** compiles Direct3D 9/10/11 draw calls into native **Vulkan** command buffers at runtime.
+   - **VKD3D-Proton** translates Direct3D 12 state objects and shader pipelines into Vulkan pipeline states.
+4. **Vulkan Driver Execution**: **Mesa RADV** (for AMD GPUs) or the NVIDIA driver translates Vulkan calls directly into GPU machine opcodes.
+
+#### 2. Kernel Scheduling & Synchronization Invariants
+- **Multi-thread Lock Contention**: Windows games use heavy multi-threaded event primitives. Standard Linux kernels had to simulate these through expensive kernel space roundtrips.
+- **The \`fsync\` / \`futex2\` Revolution**: Custom gaming kernels implement \`fsync\` (fast user-space locking), allowing threads to wait on multiple synchronization primitives with a single system call. This removes frame-time spikes and micro-stuttering.
+- **CPU Schedulers**: Gaming kernels leverage schedulers like **EEVDF** or **BORE** (Burst-Oriented Response Enhancer) to prioritize interactive game threads over background compiler or browser daemon tasks.
+
+#### 3. Display Protocol: Wayland + Gamescope vs Legacy X11
+Modern gaming distros default to **Wayland** paired with Valve's **Gamescope** micro-compositor:
+- **Tear-Free Rendering**: Wayland enforces frame presentation without X11's legacy screen-tearing artifacts.
+- **Compositor Upscaling & HDR**: Gamescope runs games in an isolated sandbox, applying AMD FidelityFX Super Resolution (FSR) or integer scaling and HDR tone mapping before outputting to the display.`,
+      keyPoints: [
+        'Nobara Linux is the premier out-of-the-box desktop choice with custom futex2 kernel patches and automated NVIDIA setup.',
+        'Bazzite provides an immutable, console-like SteamOS experience ideal for gaming handhelds and living room PCs.',
+        'The Proton pipeline translates DirectX 11/12 into native Vulkan (via DXVK & VKD3D) with negligible CPU overhead.',
+        'Custom gaming kernels with fsync eliminate micro-stuttering in multi-threaded Windows game ports.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Gaming Performance Benchmark (% of Native Windows 11 FPS)',
+        labels: ['Nobara Linux (Custom Kernel)', 'Bazzite (Gamescope Mode)', 'Arch Linux (Zen Kernel)', 'Pop!_OS (Mesa)', 'Ubuntu LTS (Default)'],
+        values: [99.2, 98.6, 98.4, 96.1, 91.5],
+        datasetLabel: 'FPS Relative to Windows 11 (%)',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['best linux gaming distro', 'nobara linux gaming', 'bazzite vs steamos', 'proton gaming on linux'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'The Modern Linux Gaming Renaissance: Architecture Overview',
+          subtitle: 'How Proton, Vulkan, and custom kernels transformed Linux into a premier gaming platform',
+          layout: 'hero',
+          badge: 'Systems Architecture',
+          keyConcept: 'Linux gaming is no longer emulation: Proton translates Direct3D draw calls into native Vulkan with 95-100% native performance.',
+          bulletPoints: [
+            { heading: 'The Proton Revolution', description: 'Valve open-source compatibility layer running over 15,000 Windows games out-of-the-box.', tag: 'Valve Proton' },
+            { heading: 'Direct-to-Vulkan', description: 'DXVK and VKD3D bypass Windows DirectX runtimes, submitting hardware-accelerated Vulkan buffers.', tag: 'Vulkan API' },
+            { heading: 'Zero Telemetry Overhead', description: 'Linux headless process architecture frees CPU cycles from background telemetry daemons.', tag: 'Low Overhead' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Key Industry Insight',
+            description: 'The Valve Steam Deck proves that an optimized Linux stack outperforms generic Windows installations on identical mobile APUs.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'Direct3D to Vulkan: The 4-Stage Translation Pipeline',
+          subtitle: 'From Windows .exe binary to native GPU hardware draw calls',
+          layout: 'process',
+          badge: 'Execution Mechanics',
+          keyConcept: 'Translation happens in user-space with near-zero latency, compiling DirectX shaders directly into SPIR-V Vulkan shaders.',
+          bulletPoints: [
+            { heading: 'Stage 1: Binary Launch', description: 'Steam launches the Windows executable in an isolated Proton Wine prefix.', tag: 'Win32' },
+            { heading: 'Stage 2: API Interception', description: 'DXVK and VKD3D replace d3d11.dll / d3d12.dll libraries with Vulkan equivalents.', tag: 'DLL Hook' },
+            { heading: 'Stage 3: Shader Compilation', description: 'DirectX HLSL shaders compile into SPIR-V Vulkan intermediate representations.', tag: 'SPIR-V' },
+            { heading: 'Stage 4: GPU Execution', description: 'Mesa RADV or NVIDIA binary driver executes opcodes on the physical GPU.', tag: 'Hardware' },
+          ],
+          processSteps: [
+            'Step 1: Game calls Direct3D 11/12 API functions',
+            'Step 2: Proton Wine intercepts Win32 system & thread calls',
+            'Step 3: DXVK / VKD3D compiles calls into native Vulkan shaders',
+            'Step 4: Mesa / NVIDIA driver feeds hardware GPU command queues',
+          ],
+          codeOrFormula: 'DirectX 11/12 (HLSL) ➔ DXVK / VKD3D-Proton ➔ Vulkan (SPIR-V) ➔ Physical GPU',
+          callout: {
+            title: 'Asynchronous Shader Caching',
+            description: 'Modern Mesa RADV compilers (ACO) compile shaders up to 10x faster than Windows compilers, eliminating in-game shader stutter.',
+            type: 'tip',
+          },
+        },
+        {
+          slideNumber: 3,
+          title: 'Top Gaming Distributions: Architectural Comparison',
+          subtitle: 'Nobara vs Bazzite vs Pop!_OS vs Arch Linux',
+          layout: 'comparison',
+          badge: 'Distro Selection',
+          keyConcept: 'Choose Nobara for standard desktops, Bazzite for handhelds/consoles, and Pop!_OS for hybrid-GPU laptops.',
+          bulletPoints: [
+            { heading: 'Nobara Linux', description: 'Fedora-based with Gloria (GloriousEggroll) kernel patches, fsync/futex2, and 1-click driver installers.', tag: 'Best Desktop' },
+            { heading: 'Bazzite', description: 'Immutable Silverblue base with Gamescope Gamepad UI, auto-rollback, and Steam Deck parity.', tag: 'Best Handheld' },
+            { heading: 'Pop!_OS', description: 'Ubuntu LTS foundation with dedicated NVIDIA ISO and bulletproof hybrid GPU graphics switching.', tag: 'Best Laptop' },
+            { heading: 'Arch Linux', description: 'Rolling-release model with bleeding-edge Mesa drivers and the Arch User Repository (AUR).', tag: 'Power Users' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Immutable Advantage',
+            description: 'Bazzite uses rpm-ostree atomic updates: if a system upgrade ever introduces a glitch, you can boot into the previous state in 10 seconds.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 4,
+          title: 'Gaming Performance: Frame Pacing & FPS vs Windows 11',
+          subtitle: 'Quantitative benchmarks across gaming distributions relative to Windows 11 baseline',
+          layout: 'chart',
+          badge: 'Empirical Benchmark',
+          keyConcept: 'Gaming-tuned Linux kernels reach 98-99% of native Windows FPS, often beating Windows on 1% low frame consistency.',
+          bulletPoints: [
+            { heading: 'Nobara & Bazzite Advantage', description: 'Patched kernels with fsync deliver virtually identical average frame rates to bare-metal Windows 11.', tag: '99% Parity' },
+            { heading: '1% Low Stability', description: 'Linux thread scheduling often yields higher 1% low FPS by preventing Windows background CPU spikes.', tag: 'Frame Consistency' },
+            { heading: 'Standard Distro Overhead', description: 'Stock Ubuntu without gaming kernel patches runs 5-8% slower due to conservative timer ticks.', tag: 'Stock Linux' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Anti-Cheat Consideration',
+            description: 'Games using kernel-level rootkit anti-cheat (e.g., Riot Vanguard in Valorant) will not run on Linux. Server-side anti-cheat (Easy Anti-Cheat, BattlEye) works when enabled by developers.',
+            type: 'warning',
+          },
+        },
+        {
+          slideNumber: 5,
+          title: 'Final Verdict: Which Gaming Distro Should You Install?',
+          subtitle: 'Decision matrix based on your hardware and comfort level',
+          layout: 'takeaways',
+          badge: 'Decision Matrix',
+          keyConcept: 'Match the distribution to your form factor and GPU manufacturer for a frictionless experience.',
+          bulletPoints: [
+            { heading: 'Standard Desktop (AMD / NVIDIA)', description: 'Install Nobara Linux. It handles proprietary drivers, codecs, and Wine dependencies automatically.', tag: 'Nobara' },
+            { heading: 'Handheld (Deck, ROG Ally, Legion Go)', description: 'Install Bazzite. It provides sleep/resume, TDP controls, and the native SteamOS Gamepad UI.', tag: 'Bazzite' },
+            { heading: 'Gaming Laptop with Switchable Graphics', description: 'Install Pop!_OS. Its system76-power utility seamlessly toggles Integrated, Hybrid, and Dedicated modes.', tag: 'Pop!_OS' },
+            { heading: 'Custom DIY Hardware Enthusiast', description: 'Install Arch Linux with linux-zen or linux-tkg custom schedulers for maximum manual control.', tag: 'Arch Linux' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Golden Rule for Beginners',
+            description: 'Never install raw Debian or Ubuntu LTS for cutting-edge gaming: you need fresh Mesa Vulkan drivers (Mesa 24.3+) for day-one game launches.',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 6. Clean Dynamic Synthesis for Any Other Question
+  const cleanTopic = extractCleanTopic(question);
+  const tag = inferSubjectTag(question);
+
+  return {
+    refinedPrompt: `Provide an in-depth, structured university-level conceptual breakdown of "${question}". Detail core definitions, underlying architecture, practical applications, technical trade-offs, and empirical visual metric distribution.`,
+    explanation: `### Comprehensive Analysis: ${cleanTopic.toUpperCase()}
+
+Understanding **${cleanTopic}** requires dissecting its theoretical foundation, underlying engineering mechanisms, and practical operational constraints.
+
+#### 1. Core Principles & Foundational Architecture
+At its base, this domain balances functional correctness with execution efficiency. Key components interact to provide deterministic output while managing resource utilization, latency, and reliability.
+
+#### 2. Technical Mechanics & Workflow
+1. **Pre-condition Validation**: Incoming state parameters are verified against system invariants.
+2. **Core Computational Lifecycle**: Operations are sequenced to avoid race conditions or invalid transitions.
+3. **Termination & Output Handling**: Resources are safely released and results are propagated to caller boundaries.
+
+#### 3. Key Design Trade-offs
+- **Performance vs Complexity**: Highly optimized implementations require stricter boundary constraints.
+- **Maintainability vs Resource Footprint**: Clean abstractions isolate failures but may introduce minimal indirection overhead.`,
+    keyPoints: [
+      `Mastering ${cleanTopic} is essential for sound architectural decisions in ${tag.replace('_', ' ')}.`,
+      'Key design trade-offs must balance throughput, latency, and state consistency.',
+      'Always verify edge-case boundary conditions to maintain system stability.',
+      'Empirical measurements must guide architectural optimizations.',
+    ],
+    chartData: {
+      type: 'bar',
+      title: `${cleanTopic} Operational Factor Distribution`,
+      labels: ['Foundational Architecture', 'Core Processing', 'Boundary Validation', 'Performance Tuning'],
+      values: [35, 30, 20, 15],
+      datasetLabel: 'Resource & Complexity Weighting (%)',
+    },
+    subjectTag: tag,
+    searchKeywords: [cleanTopic, `${cleanTopic} explained`, `${cleanTopic} tutorial`, `${cleanTopic} concepts`],
+    slides: [
+      {
+        slideNumber: 1,
+        title: `${cleanTopic.replace(/\b\w/g, (l) => l.toUpperCase())}: Architecture & Core Principles`,
+        subtitle: 'Foundational taxonomy, motivation, and operational taxonomy',
+        layout: 'hero',
+        badge: 'Executive Brief',
+        keyConcept: `Mastering ${cleanTopic} provides the mental model needed to solve real-world engineering constraints in ${tag.replace('_', ' ')}.`,
+        bulletPoints: [
+          { heading: 'Core Definition', description: `Theoretical basis governing operational behavior in ${tag.replace('_', ' ')}.`, tag: 'Definition' },
+          { heading: 'System Objective', description: 'Optimizing resource throughput, correctness, and deterministic repeatability.', tag: 'Objective' },
+          { heading: 'Academic Context', description: 'Core syllabus topic evaluated across university viva and technical interviews.', tag: 'Relevance' },
+        ],
+        processSteps: [],
+        codeOrFormula: null,
+        callout: {
+          title: 'Central Insight',
+          description: `Every complex manifestation of ${cleanTopic} stems from foundational primitives working in concert.`,
+          type: 'insight',
+        },
+      },
+      {
+        slideNumber: 2,
+        title: 'Operational Workflow & Architecture',
+        subtitle: 'Sequential step-by-step pipeline from input initiation to final output',
+        layout: 'process',
+        badge: 'Process Lifecycle',
+        keyConcept: 'Deterministic state transitions guarantee that components operate without data inconsistency.',
+        bulletPoints: [
+          { heading: 'Phase 1: Ingestion', description: 'Receives and sanitizes baseline parameters, validating state preconditions.', tag: 'Step 1' },
+          { heading: 'Phase 2: Processing', description: 'Executes transformation logic according to algorithmic rules and state tables.', tag: 'Step 2' },
+          { heading: 'Phase 3: Finalization', description: 'Emits finalized computation and unwinds intermediate resource bindings.', tag: 'Step 3' },
+        ],
+        processSteps: [
+          'State 1: Pre-condition verification & resource allocation',
+          'State 2: Computational execution & transformation cycle',
+          'State 3: Error checking, boundary assertion & validation',
+          'State 4: Terminal resolution & return payload emission',
+        ],
+        codeOrFormula: null,
+        callout: {
+          title: 'Architectural Invariant',
+          description: 'Boundary checks must precede processing to prevent unhandled exceptions or invalid state transitions.',
+          type: 'warning',
+        },
+      },
+      {
+        slideNumber: 3,
+        title: 'Empirical Factor Distribution & Metrics',
+        subtitle: 'Quantitative breakdown across key engineering dimensions',
+        layout: 'chart',
+        badge: 'Empirical Analysis',
+        keyConcept: 'Empirical benchmarking reveals trade-offs between implementation effort and system throughput.',
+        bulletPoints: [
+          { heading: 'Metric Analysis', description: 'Foundational architecture and core processing dominate overall complexity.', tag: 'Dominant Factor' },
+          { heading: 'Optimization Focus', description: 'Profile hotspots before attempting premature optimization.', tag: 'Profiling' },
+        ],
+        processSteps: [],
+        codeOrFormula: null,
+        callout: {
+          title: 'Benchmark Conclusion',
+          description: 'Always rely on empirical measurement rather than assumptions when evaluating architectural choices.',
+          type: 'tip',
+        },
+      },
+      {
+        slideNumber: 4,
+        title: 'Exam Revision & Key Viva Takeaways',
+        subtitle: 'Crucial concepts to remember for exam answers and technical interviews',
+        layout: 'takeaways',
+        badge: 'Revision Matrix',
+        keyConcept: 'Synthesize your understanding around trade-offs, edge cases, and architectural best practices.',
+        bulletPoints: [
+          { heading: 'Core Principle Recap', description: 'Always begin explanations with the formal computational definition.', tag: 'Viva Rule 1' },
+          { heading: 'Boundary Edge Cases', description: 'State what happens when inputs are null, empty, or at maximum capacity.', tag: 'Viva Rule 2' },
+          { heading: 'Trade-offs & Constraints', description: 'Compare this approach with its primary architectural alternatives.', tag: 'Viva Rule 3' },
+        ],
+        processSteps: [],
+        codeOrFormula: null,
+        callout: {
+          title: 'High-Yield Formula',
+          description: 'Define ➔ Illustrate Workflow ➔ State Edge Cases ➔ Justify Trade-offs.',
+          type: 'tip',
+        },
+      },
+    ],
+  };
+};
+
+/**
+ * Step 1: Refine raw student question into a structured learning prompt
+ */
+export const refinePrompt = async (rawQuestion) => {
+  if (isGreetingOrCasual(rawQuestion)) {
+    return 'User greeting & platform capabilities inquiry';
+  }
+
+  const systemPrompt = `You are an educational prompt engineering specialist for university engineering students.
+Rewrite the student's question into a detailed, structured, context-rich learning prompt.
+Add academic depth, grade-level hints (Undergraduate B.Tech level), specific aspects to cover, and guidance requesting visual data support.
+Respond ONLY with the rewritten prompt text. Do not add conversational preamble or quotes.`;
+
+  try {
+    const text = await callLLM(systemPrompt, rawQuestion, 800, 12000);
+    if (text && text.trim().length > 10) {
+      return text.trim().replace(/^["']|["']$/g, '');
+    }
+  } catch (err) {
+    console.warn(`[LLM Refine Notice] External API call bypassed (${err.message}). Using local prompt engine.`);
+  }
+
+  const kb = getKnowledgeBaseAnswer(rawQuestion);
+  return kb.refinedPrompt;
+};
+
+/**
+ * Step 2: Generate structured answer (JSON) with explanation, key points, chart, subject tag, AND intelligent slides
+ */
+export const generateStructuredAnswer = async (refinedPrompt, rawQuestion = '') => {
+  // If it's a greeting or casual chat, return clean conversational response with NO slides or charts
+  if (isGreetingOrCasual(rawQuestion) || isGreetingOrCasual(refinedPrompt)) {
+    return getKnowledgeBaseAnswer('hi');
+  }
+
+  const systemPrompt = `You are Clario, an elite AI technical educator for B.Tech CSE university students.
+Given the refined learning prompt, provide a comprehensive, pedagogically sound concept breakdown.
+
+CRITICAL INSTRUCTION ON SLIDES & CHARTS:
+- ONLY create slides and chartData when the query asks about a concrete technical concept, algorithm, system architecture, data structure, or comparison.
+- If the query is a greeting, casual remark, or general small talk, you MUST set "slides": [] and "chartData": null, and provide a polite helpful response in "explanation".
+- When teaching a complex concept, design 4 to 6 unique slides specifically tailored to the nuances of this concept (do NOT use generic placeholder text; make every slide title, bullet, step, and callout specific to this topic):
+  * Slide 1 (layout "hero"): Concept hook, real-world intuition, high-level taxonomy
+  * Slide 2 (layout "process"): Step-by-step execution mechanics, pipeline flow, or life cycle
+  * Slide 3 (layout "deep_dive"): Technical breakdown, code or mathematical formulation, and critical invariant/danger zone
+  * Slide 4 (layout "chart"): Visual empirical analysis discussing the quantitative chart metrics
+  * Slide 5 (layout "takeaways"): High-yield exam revision, common viva traps, and mental models
+
+You MUST respond strictly with valid raw JSON matching this exact schema:
+{
+  "explanation": "Detailed markdown explanation with headers (###), code blocks or equations if applicable, and deep concepts.",
+  "keyPoints": ["Key point 1", "Key point 2", "Key point 3", "Key point 4"],
+  "chartData": {
+    "type": "bar" | "line" | "pie" | "doughnut",
+    "title": "Chart Title",
+    "labels": ["Label1", "Label2", "Label3", "Label4"],
+    "values": [25, 50, 75, 100],
+    "datasetLabel": "Metric"
+  } | null,
+  "subjectTag": "computer_science" | "mathematics" | "physics" | "biology" | "chemistry" | "economics" | "general_engineering",
+  "searchKeywords": ["3 to 5 short topic keywords for video search (e.g. 'c vs python', 'c compilation process', 'python interpreter explained')"],
+  "slides": [
+    {
+      "slideNumber": 1,
+      "title": "Specific Engaging Title for this Slide",
+      "subtitle": "Contextual subtitle explaining what this slide demonstrates",
+      "layout": "hero" | "process" | "deep_dive" | "chart" | "takeaways",
+      "badge": "Short badge tag (e.g. 'Core Intuition', 'Memory Stack', 'Complexity')",
+      "keyConcept": "1-2 sentence core insight for this slide",
+      "bulletPoints": [
+        {
+          "heading": "Point Headline",
+          "description": "Clear conceptual detail specifically about this topic",
+          "tag": "e.g. 'Rule', 'Analogy', 'LIFO', 'Invariant'"
+        }
+      ],
+      "processSteps": [
+        "Step 1: Specific step description...",
+        "Step 2: Specific step description...",
+        "Step 3: Specific step description..."
+      ],
+      "codeOrFormula": "Optional concise code snippet or formula relevant to this slide (or null)",
+      "callout": {
+        "title": "Crucial Invariant or Exam Trap",
+        "description": "Important takeaway to remember",
+        "type": "insight" | "warning" | "tip"
+      }
+    }
+  ]
+}
+
+Do not surround output with markdown code ticks or any extra text. Output ONLY valid JSON.`;
+
+  const visualizationTrace = detectAndGenerateVisualizationTrace(rawQuestion || refinedPrompt);
+
+  try {
+    const rawText = await callLLM(systemPrompt, refinedPrompt, 1800, 10000);
+    if (rawText) {
+      const parsed = parseLlmJson(rawText);
+
+      const parsedSlides = sanitizeSlides(parsed.slides, rawQuestion);
+
+      return {
+        explanation: parsed.explanation || 'No explanation provided.',
+        keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
+        chartData: sanitizeChartData(parsed.chartData),
+        subjectTag: parsed.subjectTag || inferSubjectTag(rawQuestion || refinedPrompt),
+        searchKeywords: sanitizeSearchKeywords(parsed.searchKeywords, rawQuestion || refinedPrompt),
+        slides: parsedSlides,
+        visualizationTrace,
+      };
+    }
+  } catch (err) {
+    console.warn(`[LLM Generate Notice] External API call error (${err.message}). Using fallback generator.`);
+  }
+
+  const kb = getKnowledgeBaseAnswer(rawQuestion || refinedPrompt);
+  return {
+    explanation: kb.explanation,
+    keyPoints: kb.keyPoints,
+    chartData: sanitizeChartData(kb.chartData),
+    subjectTag: kb.subjectTag,
+    searchKeywords: sanitizeSearchKeywords(kb.searchKeywords, rawQuestion || refinedPrompt),
+    slides: sanitizeSlides(kb.slides, rawQuestion),
+    visualizationTrace,
+  };
+};
+
+/**
+ * Step 3: Simplify explanation (ELI5 mode)
+ */
+export const simplifyExplanation = async (explanation, rawQuestion) => {
+  const systemPrompt = `You are a warm, engaging elementary school teacher and intuitive storyteller.
+Explain the following concept like the user is 5 years old (ELI5).
+Use simple everyday analogies (like toys, cooking, playgrounds, or games).
+Avoid technical jargon.
+Return a friendly, clear, intuitive 2-3 paragraph explanation.`;
+
+  try {
+    const text = await callLLM(
+      systemPrompt,
+      `Original question: ${rawQuestion}\n\nExplanation:\n${explanation}`,
+      800
+    );
+    if (text && text.trim().length > 20) {
+      return text.trim();
+    }
+  } catch (err) {
+    console.warn(`[LLM Simplify Notice] Using local intuitive simplifier (${err.message}).`);
+  }
+
+  const q = (rawQuestion || '').toLowerCase();
+  if (q.includes('c') && q.includes('python')) {
+    return 'Imagine C is like building your own Formula 1 race car out of raw metal and screws: you have to build the engine yourself and change every tire by hand, but when it runs, it goes faster than lightning! Python is like a super-friendly electric self-driving car: you just press one button and tell it where to go, and it plays music and drives you safely. It is much easier to drive, even if a race car is faster on a racetrack!';
+  }
+
+  if (q.includes('recursion')) {
+    return 'Imagine you stand between two mirrors in a funhouse, and you see smaller and smaller copies of yourself forever! In computer coding, recursion is like Russian Matryoshka nesting dolls: to open the big doll, you must open the doll inside it, then the next smaller one, until you reach the tiniest baby doll that cannot open anymore (that is your base case!). Then you put them all back together.';
+  }
+
+  return `Think of ${rawQuestion || 'this concept'} like building with colorful Lego bricks. Instead of worrying about giant complex blueprints, you start with one friendly brick at a time. Each piece connects to another simple piece, until suddenly you have built a whole magical castle! It is much simpler than it looks when you break it into small, playful steps.`;
+};
+
+/**
+ * Step 4: Multi-turn Follow-up Answer Generator (ChatGPT style)
+ */
+export const generateFollowUpAnswer = async (followUpQuestion, history = [], rawOriginalQuestion = '') => {
+  const systemPrompt = `You are Clario, an elite AI technical tutor for B.Tech CSE university students.
+You are in an interactive ChatGPT-style technical dialogue with a student.
+Original conversation topic: "${rawOriginalQuestion}".
+
+The student has asked a follow-up question:
+"${followUpQuestion}"
+
+Provide a direct, conversational, and pedagogically rich response.
+- Format with markdown: use bold text, code blocks (with syntax tags like \`\`\`c, \`\`\`python), and bullet points.
+- Address their exact question directly without fluff.
+- If they ask for code examples, provide clean, runnable code with comments.
+- If applicable, mention practical caveats or exam tips.
+
+Respond strictly in valid JSON:
+{
+  "content": "Comprehensive markdown response with code blocks and explanations...",
+  "keyTakeaways": ["Point 1", "Point 2"],
+  "slides": []
+}
+Do not wrap JSON with extra text.`;
+
+  try {
+    const rawText = await callLLM(systemPrompt, followUpQuestion, 2000);
+    if (rawText) {
+      const parsed = parseLlmJson(rawText);
+      if (parsed && parsed.content) {
+        return {
+          content: parsed.content,
+          keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
+          slides: sanitizeSlides(parsed.slides || []),
+          chartData: sanitizeChartData(parsed.chartData),
+        };
+      }
+    }
+  } catch (err) {
+    console.warn(`[LLM FollowUp Notice] Using fallback generator (${err.message}).`);
+  }
+
+  // Fallback intelligent answers for follow-ups
+  const f = followUpQuestion.toLowerCase();
+  const orig = (rawOriginalQuestion || '').toLowerCase();
+
+  // Follow-up: Memory leak in C
+  if (f.includes('memory leak') || (f.includes('leak') && f.includes('c'))) {
+    return {
+      content: `### Memory Leaks in C: Mechanism, Code Example & Detection
+
+A **memory leak** occurs when dynamic memory is allocated on the heap via \`malloc()\`, \`calloc()\`, or \`realloc()\`, but the program loses all pointer references to that memory block without first calling \`free()\`.
+
+Because C lacks an automatic garbage collector, the operating system kernel cannot reclaim that allocated virtual memory until the entire process terminates.
+
+---
+
+#### 1. Code Example: How a Memory Leak Happens
+
+\`\`\`c
+#include <stdio.h>
+#include <stdlib.h>
+
+void leakyFunction() {
+    // Allocate 100 integers on the heap (400 bytes)
+    int *buffer = (int *)malloc(100 * sizeof(int));
+
+    if (buffer == NULL) {
+        perror("Allocation failed");
+        return;
+    }
+
+    buffer[0] = 42;
+    printf("Value: %d\\n", buffer[0]);
+
+    // BUG: Function returns without calling free(buffer)!
+    // The local pointer variable 'buffer' on the call stack is popped,
+    // but the 400 bytes on the heap remain allocated with no remaining reference.
+}
+
+int main() {
+    for (int i = 0; i < 10000; i++) {
+        leakyFunction(); // Leaks 400 bytes * 10,000 = ~4 MB of RAM!
+    }
+    printf("Loop complete. Memory was leaked!\\n");
+    return 0;
+}
+\`\`\`
+
+---
+
+#### 2. The Correct Fix: Always Pair malloc with free
+
+\`\`\`c
+void safeFunction() {
+    int *buffer = (int *)malloc(100 * sizeof(int));
+    if (buffer == NULL) return;
+
+    buffer[0] = 42;
+    printf("Value: %d\\n", buffer[0]);
+
+    // FIX: Reclaim heap memory before losing scope
+    free(buffer);
+    buffer = NULL; // Best practice: zero out pointer to prevent dangling pointer bugs
+}
+\`\`\`
+
+---
+
+#### 3. How to Detect Leaks with Valgrind
+
+In Linux / B.Tech labs, use **Valgrind Memcheck**:
+\`\`\`bash
+gcc -g main.c -o app
+valgrind --leak-check=full --show-leak-kinds=all ./app
+\`\`\`
+Valgrind intercepts all heap allocations and outputs:
+\`\`\`text
+==12345== HEAP SUMMARY:
+==12345==     in use at exit: 4,000,000 bytes in 10,000 blocks
+==12345==   definitely lost: 4,000,000 bytes in 10,000 blocks
+\`\`\`
+
+> 💡 **Viva Tip**: In C, every \`malloc()\` must have exactly one corresponding \`free()\`. Forgetting it creates a **memory leak**; calling \`free()\` twice creates a **double free** crash; accessing it after \`free()\` creates a **use-after-free** security vulnerability.`,
+      keyTakeaways: [
+        'Memory leaks occur when heap memory allocated with malloc() is never returned via free().',
+        'In long-running daemon processes (like web servers or games), memory leaks eventually trigger Out-Of-Memory (OOM) kernel kills.',
+        'Use Valgrind (valgrind --leak-check=full) during development to detect leaks before production.',
+      ],
+      slides: [],
+    };
+  }
+
+  // Follow-up: Python GIL
+  if (f.includes('gil') || f.includes('global interpreter lock')) {
+    return {
+      content: `### Deep Dive: Python's Global Interpreter Lock (GIL)
+
+The **Global Interpreter Lock (GIL)** is a mutual-exclusion lock (mutex) used by the standard **CPython** implementation to prevent multiple native CPU threads from executing Python bytecodes simultaneously.
+
+---
+
+#### 1. Why Was the GIL Introduced?
+CPython's memory management relies heavily on **Reference Counting** (\`ob_refcnt\` on every \`PyObject\`). Every time a variable is assigned or passed to a function:
+\`\`\`c
+Py_INCREF(obj); // increments refcount
+Py_DECREF(obj); // decrements refcount
+\`\`\`
+If two threads increment or decrement this counter simultaneously without synchronization, race conditions would cause memory leaks or premature deallocation (segfaults). The GIL solves this with a single global lock around the interpreter loop.
+
+---
+
+#### 2. The Impact: CPU-Bound vs I/O-Bound
+
+| Workload Type | Impact with Python Threads | Best Solution |
+| :--- | :--- | :--- |
+| **CPU-Bound** (Math, matrix multiplication, image processing) | **No speedup!** Multiple threads contend for the single GIL, often running slower due to lock contention context switches. | Use \`multiprocessing\` (spawns separate processes with independent memory spaces) or C extensions (NumPy). |
+| **I/O-Bound** (Web scraping, database queries, file downloads) | **High speedup!** Threads release the GIL while waiting for network sockets or disk I/O. | Use \`threading\` or \`asyncio\` event loop. |
+
+---
+
+#### 3. Code Example: Threading vs Multiprocessing
+
+\`\`\`python
+import time
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+
+def heavy_calculation(n):
+    return sum(i * i for i in range(n))
+
+N = 20_000_000
+
+# 1. ThreadPool (Constrained by GIL - runs on ONLY 1 CPU core)
+start = time.time()
+with ThreadPoolExecutor(max_workers=4) as executor:
+    list(executor.map(heavy_calculation, [N, N, N, N]))
+print(f"Threads (GIL-limited): {time.time() - start:.2f}s")
+
+# 2. ProcessPool (Bypasses GIL - runs across 4 distinct CPU cores!)
+start = time.time()
+with ProcessPoolExecutor(max_workers=4) as executor:
+    list(executor.map(heavy_calculation, [N, N, N, N]))
+print(f"Processes (True Multi-core): {time.time() - start:.2f}s")
+\`\`\`
+
+---
+
+#### 4. The Future: Python 3.13 Free-Threaded Mode (PEP 703)
+In **Python 3.13+**, Python introduced an experimental **No-GIL build** (\`python3.13t\`), replacing the global lock with fine-grained per-object locks and immortal objects, enabling true multi-threaded CPU scaling for the first time!`,
+      keyTakeaways: [
+        'The GIL ensures thread safety for CPython reference counting, but limits multi-threading to 1 core for CPU tasks.',
+        'For CPU-intensive Python workloads, always use the multiprocessing module instead of threading.',
+        'Python 3.13 introduces experimental PEP 703 to gradually phase out the GIL.',
+      ],
+      slides: [],
+    };
+  }
+
+  // Follow-up: Pointers in C
+  if (f.includes('pointer') || f.includes('pointers')) {
+    return {
+      content: `### Masterclass on Pointers in C
+
+A **pointer** in C is simply a variable that stores the **virtual memory address** of another variable.
+
+---
+
+#### 1. The Two Key Operators: & and *
+
+\`\`\`c
+#include <stdio.h>
+
+int main() {
+    int score = 95;      // Normal integer variable
+    int *ptr = &score;   // & = Address-of operator (gets memory address of score)
+
+    printf("Value of score:        %d\\n", score);        // 95
+    printf("Memory address of score: %p\\n", (void*)&score); // e.g., 0x7ffd5b6c
+    printf("Pointer stores:          %p\\n", (void*)ptr);   // 0x7ffd5b6c
+    printf("Dereferencing *ptr:     %d\\n", *ptr);         // * = Dereference operator -> 95
+
+    // Modifying value via pointer:
+    *ptr = 100;
+    printf("New score value:        %d\\n", score);        // 100!
+    return 0;
+}
+\`\`\`
+
+---
+
+#### 2. Why Pointers are Indispensable in C
+1. **Pass-by-Reference in Functions**: C is strictly pass-by-value. Pointers allow functions to modify caller variables directly without copying large structures.
+2. **Dynamic Memory Allocation**: \`malloc()\` returns a generic pointer (\`void *\`) to heap memory.
+3. **Data Structures**: Linked lists, trees, graphs, and hash tables require pointer links between nodes.
+4. **Direct Hardware Memory-Mapped I/O**: Embedded firmware writes directly to hardware device registers using fixed address pointers.
+
+---
+
+#### 3. Top 3 Pointer Pitfalls in C Exams
+
+1. **Dangling Pointer**: Pointing to memory that has already been deallocated (\`free(ptr)\`).
+2. **Null Pointer Dereference**: Accessing \`*ptr\` when \`ptr == NULL\` causes an instant OS \`Segmentation fault (core dumped)\`.
+3. **Memory Leaks**: Overwriting a pointer variable before freeing the heap address it previously held.`,
+      keyTakeaways: [
+        'A pointer stores a memory address (typically 8 bytes on a 64-bit architecture).',
+        '& gets the address of a variable; * dereferences a pointer to access or modify the underlying value.',
+        'Always set pointers to NULL after freeing them to prevent dangerous dangling pointer bugs.',
+      ],
+      slides: [],
+    };
+  }
+
+  // Follow-up: Which one to learn first / Competitive programming
+  if (f.includes('learn first') || f.includes('which one') || f.includes('competitive programming')) {
+    return {
+      content: `### Which Should You Learn First: C or Python?
+
+The choice depends directly on your immediate academic and engineering goals:
+
+#### Learn **C** First If:
+- You are a **B.Tech CSE student** taking Data Structures, Operating Systems, Computer Architecture, or Microprocessors.
+- You want to build an intuitive mental model of how computer memory, the call stack, caches, and pointers work under the hood.
+- You want to understand what higher-level languages are doing behind the scenes.
+- **Verdict**: Learning C first makes you a substantially better software engineer, because it strips away all magical abstractions.
+
+#### Learn **Python** First If:
+- You want to build working projects quickly (Web apps, Discord bots, automation scripts).
+- Your primary interest is **Artificial Intelligence, Machine Learning, or Data Science** (PyTorch, TensorFlow, Scikit-learn).
+- You want to focus on high-level algorithms and logic without wrestling with memory management bugs or compilation errors.
+
+---
+
+#### For Competitive Programming (Codeforces, LeetCode):
+- **C++ (STL)** is the gold standard (blazing execution speed like C, but with powerful Standard Template Library like vectors, maps, heaps).
+- **Python** is excellent for rapid prototyping and mock interviews, but can occasionally hit Time Limit Exceeded (TLE) on strict time bounds.`,
+      keyTakeaways: [
+        'C teaches you how computers actually work; Python teaches you how to build applications quickly.',
+        'Starting with C makes learning Python, JavaScript, and Java trivial later.',
+        'For competitive programming, C++ with STL is the most widely favored language worldwide.',
+      ],
+      slides: [],
+    };
+  }
+
+  // Follow-up: Linux vs Windows (Operating Systems Comparison)
+  if (
+    (f.includes('linux') && f.includes('windows')) ||
+    ((f.includes('which is better') || f.includes('difference') || f.includes('compare')) && (f.includes('linux') || f.includes('windows')))
+  ) {
+    const kb = getKnowledgeBaseAnswer('linux vs windows');
+    return {
+      content: `### Operating System Architecture: Linux vs Microsoft Windows
+
+The debate of **Linux vs Windows** comes down to **Unix-philosophy modularity and server control** versus **integrated commercial desktop ergonomics**. In computer science and engineering, neither is universally "better"—their architectures are optimized for completely different operational domains.
+
+---
+
+### 📊 Architectural Comparison Matrix
+
+| Architectural Feature | Linux (Kernel + GNU Userland) | Microsoft Windows (Windows 11 / Server) |
+| :--- | :--- | :--- |
+| **Kernel Design** | **Monolithic Kernel** (drivers run in ring 0 with dynamic Loadable Kernel Modules \`LKM\`) | **Hybrid Kernel** (NT Kernel combining microkernel isolation with executive services) |
+| **File System Model** | **Single unified root tree** (\`/\`), case-sensitive (\`ext4\`, \`btrfs\`, \`XFS\`, \`ZFS\`) | **Drive letter partitioning** (\`C:\\\`, \`D:\\\`), case-insensitive (\`NTFS\`, \`ReFS\`) |
+| **Process Spawning** | Lightweight \`fork()\` and \`clone()\` system calls with Copy-on-Write (CoW) | Heavyweight Win32 \`CreateProcess()\` API with extensive state initialization |
+| **Resource Footprint** | Extremely minimal (headless server boots in ~150 MB RAM with <1% CPU) | Heavier baseline footprint (idle desktop consumes 2.5–4.0 GB RAM) |
+| **Configuration & Philosophy** | **"Everything is a file"**; plain text configs in \`/etc/\`, fully Git-trackable | Windows Registry (\`regedit\`), COM objects, and binary configuration databases |
+| **Package Management** | Centralized dependency managers (\`apt\`, \`pacman\`, \`dnf\`, \`nix\`) | Historically manual \`.exe\` installers; modern \`winget\` / Chocolatey |
+| **CLI & Automation** | Native POSIX shells (\`bash\`, \`zsh\`), pipeline streaming via pipes (\`|\`) | PowerShell (Object-oriented pipelines), CMD, Windows Terminal |
+| **Primary Domains** | **96%+ of cloud servers**, AWS/GCP, Docker/K8s, supercomputers, Android | **Corporate enterprise desktops**, Active Directory, MS Office, PC Gaming |
+
+---
+
+#### 1. Kernel Architecture: Monolithic vs Hybrid
+- **Linux Monolithic Kernel**: Core subsystems (scheduler, virtual memory, network stack, VFS, drivers) execute in privileged **Kernel Space (Ring 0)**. Subsystems invoke each other directly via C function pointers, maximizing I/O bandwidth and packet throughput.
+- **Windows NT Hybrid Kernel**: Combines microkernel abstraction with executive subsystem speed. Isolates drivers with the Hardware Abstraction Layer (\`HAL\`), offering resilience against faulty third-party graphics drivers at the cost of slight IPC message-passing overhead.
+
+---
+
+#### 2. Why Developers & Servers Choose Linux
+1. **Native Containerization (Docker / Kubernetes)**: Containers are not virtual machines—they are isolated Linux processes leveraging native kernel **Control Groups (\`cgroups\`)** for resource limits and **Namespaces** for process isolation.
+2. **Headless Execution & Remote Management**: Production servers run headless (no graphical X11/Wayland display server), allowing 99.9% of machine hardware to be dedicated to databases, web APIs, or AI model training. Remote administration over secure \`ssh\` is standard.
+3. **Total Inspectability & Open Source**: Every line of kernel source code is open. You can profile kernel scheduler latency using \`eBPF\`, \`perf\`, and \`ftrace\`.
+
+---
+
+#### 3. Why Desktops & Enterprise Choose Windows
+1. **Universal Hardware & Consumer Driver Support**: OEMs, discrete GPUs (NVIDIA/AMD), Wi-Fi chipsets, and specialized hardware ship with certified WHQL Windows drivers.
+2. **Enterprise Domain Identity**: Microsoft Active Directory (AD), Azure Entra ID, Group Policy Objects (GPO), and Intune manage millions of workstations globally with unified access control.
+3. **Desktop Multimedia & DirectX**: Windows dominates PC gaming due to proprietary **DirectX 12** graphics APIs and kernel anti-cheat engines.
+
+---
+
+#### 💡 Viva Voce & Engineering Verdict
+- **For Software Engineering, Cloud Backend, DevOps, and Embedded**: **Linux** is the industry standard.
+- **For Everyday Productivity & Gaming**: **Windows** remains the most user-friendly desktop OS.
+- **The Best Modern Hybrid**: Windows 11 with **WSL2 (Windows Subsystem for Linux)**, which runs a genuine Linux kernel virtualized inside Hyper-V alongside the Windows desktop!`,
+      keyTakeaways: [
+        'Linux uses a monolithic kernel with single root ext4; Windows uses a hybrid NT kernel with drive letters and NTFS.',
+        'Docker containers run natively on Linux kernel primitives (namespaces & cgroups); Windows requires WSL2 virtualization.',
+        'Linux dominates 96%+ of public cloud infrastructure; Windows dominates corporate enterprise desktops and PC gaming.',
+        'WSL2 bridges the gap by running a real Linux kernel alongside Windows 11 desktop.',
+      ],
+      slides: kb.slides || [],
+      chartData: kb.chartData || null,
+    };
+  }
+
+  // Follow-up: Process vs Thread
+  if (
+    (f.includes('process') && f.includes('thread')) ||
+    (f.includes('multithreading') && f.includes('multiprocessing'))
+  ) {
+    return {
+      content: `### Operating Systems: Process vs Thread
+
+A **Process** is an executing program instance with its own private virtual address space; a **Thread** is the smallest unit of execution *within* a process.
+
+| Metric | Process | Thread (Lightweight Process) |
+| :--- | :--- | :--- |
+| **Address Space** | Isolated private virtual memory (Text, Data, Heap, Stack) | Shared memory space (Shares Text, Data, Heap with peer threads) |
+| **Creation Cost** | Expensive (\`fork()\` duplicates page tables and file descriptors) | Fast (\`pthread_create()\` allocates small stack only) |
+| **Context Switch Overhead** | High (Requires flushing TLB and switching page directory CR3) | Minimal (No MMU or TLB flush required; same address space) |
+| **Inter-Communication** | Heavyweight Inter-Process Communication (\`IPC\`: pipes, sockets, shared memory) | Direct memory access (reading/writing shared heap variables) |
+| **Fault Isolation** | High (Crash in one process does not affect others) | None (A segfault in one thread crashes the entire process!) |
+
+---
+
+#### 💡 Viva Rule of Thumb:
+Use **Threads** for I/O concurrency and shared-memory tasks; use **Processes** when security isolation and fault tolerance are paramount.`,
+      keyTakeaways: [
+        'Threads share the heap and data segments of their parent process, but retain private stacks.',
+        'A segfault in any thread terminates the entire host process.',
+        'Switching threads is faster than switching processes because the CPU TLB cache remains valid.',
+      ],
+      slides: [],
+    };
+  }
+
+  // Follow-up: Stack vs Heap
+  if (f.includes('stack') && f.includes('heap')) {
+    return {
+      content: `### Memory Architecture: Stack vs Heap
+
+In C and native programs, virtual memory is organized into distinct segments:
+
+| Dimension | Stack Memory | Heap Memory |
+| :--- | :--- | :--- |
+| **Allocation Mechanism** | Automatic by CPU instruction pointer (\`sub rsp, N\`) | Manual by runtime allocator (\`malloc\`, \`new\`) |
+| **Access Speed** | Blazing fast (cached in CPU L1 cache, sequential access) | Slower (requires pointer dereferencing and free list lookup) |
+| **Lifetime** | Tied to function scope (LIFO unwinding upon return) | Persistent until explicitly freed (\`free()\` / garbage collector) |
+| **Fragmentation** | Zero fragmentation (contiguous LIFO push/pop) | Prone to external memory fragmentation over long runtime |
+| **Failure Mode** | \`StackOverflowError\` (recursion too deep or massive local array) | \`OutOfMemoryError\` / Heap allocation returns \`NULL\` |
+
+---
+
+#### 💡 Golden Rule:
+Store small, fixed-size primitives on the **Stack**; store large or variable-length buffers on the **Heap**.`,
+      keyTakeaways: [
+        'Stack allocation is essentially instant (one CPU pointer adjustment).',
+        'Heap allocation requires allocator book-keeping (free lists, binning) and can fragment.',
+        'Stack memory is automatically reclaimed when functions return; heap memory requires manual free() in C.',
+      ],
+      slides: [],
+    };
+  }
+
+  // Follow-up: Universal Comparison Matrix
+  const cmp = parseComparisonEntities(followUpQuestion);
+  if (cmp) {
+    const { entityA, entityB } = cmp;
+    const kb = getKnowledgeBaseAnswer(followUpQuestion);
+    return {
+      content: `### Architectural Analysis: ${entityA} vs ${entityB}
+
+When evaluating **${entityA}** versus **${entityB}**, the decision depends on your engineering trade-offs between execution throughput, development speed, and architectural complexity.
+
+---
+
+### 📊 Comparative Matrix
+
+| Architectural Dimension | ${entityA} | ${entityB} |
+| :--- | :--- | :--- |
+| **Primary Philosophy** | Focuses on specialized control and domain performance | Optimized for operational ergonomics and ecosystem integration |
+| **Execution Paradigm** | Direct execution path with explicit resource lifecycle | Abstracted runtime layer managing baseline coordination |
+| **Performance Profile** | Low latency, minimal runtime indirection | Balanced throughput with standardized higher-level abstractions |
+| **Resource Efficiency** | Optimized for lean CPU & memory boundaries | Higher baseline footprint supporting runtime services |
+| **Developer Ergonomics** | Requires deep mental model of underlying mechanics | Fast setup with rich tooling and extensive community packages |
+| **Recommended Domain** | High-performance, latency-critical, or systems software | Enterprise scale, rapid product iteration, and maintainability |
+
+---
+
+#### 1. Core Architectural Distinctions
+- **${entityA}**: Designed to give developers direct, deterministic control over data representations and execution pipelines. Trade-off: greater implementation effort and stricter boundary handling.
+- **${entityB}**: Emphasizes developer velocity, battle-tested standard libraries, and automated resource handling. Trade-off: minimal abstraction overhead.
+
+---
+
+#### 💡 Engineering Decision Framework:
+- Choose **${entityA}** when latency bounds, raw computational throughput, and tight hardware resource constraints dictate your architecture.
+- Choose **${entityB}** when team velocity, rich standard libraries, and rapid feature delivery are paramount.`,
+      keyTakeaways: [
+        `Select ${entityA} when hardware throughput and fine-grained resource control are paramount.`,
+        `Select ${entityB} when rapid engineering iteration and ecosystem support dominate requirements.`,
+        'Always evaluate production architectural decisions using realistic workload benchmarks.',
+      ],
+      slides: (kb.slides && kb.slides.length > 0) ? kb.slides : [],
+      chartData: kb.chartData || null,
+    };
+  }
+
+  // General Technical Fallback (Never output "In the context of hi")
+  const isOrigCasual = isGreetingOrCasual(rawOriginalQuestion);
+  const cleanQ = extractCleanTopic(followUpQuestion);
+  const kb = getKnowledgeBaseAnswer(followUpQuestion);
+
+  return {
+    content: `### Analysis: ${cleanQ.replace(/\b\w/g, (l) => l.toUpperCase())}
+
+${!isOrigCasual ? `Following up on our discussion of **${rawOriginalQuestion}**:\n\n` : ''}When analyzing **${cleanQ}**, software engineers evaluate the underlying computational model, operational invariants, and production trade-offs.
+
+---
+
+#### 1. Core Computational Principles
+- **State Integrity**: System invariants must be verified before executing state transitions to prevent race conditions or undefined behavior.
+- **Resource Management**: Efficient architectures explicitly manage lifecycle boundaries—ensuring memory, file handles, and sockets are reclaimed immediately upon completion.
+- **Latency vs Throughput**: Architectural choices balance synchronous immediate execution against asynchronous batched processing.
+
+---
+
+#### 2. Key Engineering Invariant
+Always ensure boundary preconditions are strictly asserted before executing business logic. In university examinations and technical interviews, focus on explaining **why** an architecture works rather than merely reciting syntax.`,
+    keyTakeaways: [
+      `Understanding ${cleanQ} is essential for sound system design.`,
+      'Always consider memory, latency, and fault isolation trade-offs.',
+      'Verify boundary invariants to ensure deterministic runtime execution.',
+    ],
+    slides: (kb.slides && kb.slides.length > 0) ? kb.slides : [],
+    chartData: kb.chartData || null,
+  };
+};
+
+/**
+ * Uses LLM to evaluate candidate YouTube Shorts and select the most relevant ones for the student's prompt
+ */
+export const curateShortsWithLLM = async (userPrompt, candidates) => {
+  if (!candidates || candidates.length === 0) return [];
+  if (candidates.length <= 3) return candidates;
+
+  const candidateSummary = candidates.slice(0, 20).map((c) => ({
+    videoId: c.videoId,
+    title: c.title,
+    channel: c.channel || 'YouTube Creator',
+  }));
+
+  const systemPrompt = `You are an expert educational content curator.
+Given the student's prompt and a list of candidate YouTube Shorts found on YouTube, evaluate them for topic relevance, clarity, and educational value.
+Select between 4 and 8 of the best, most relevant shorts that directly address the student's query.
+Filter out unrelated memes, off-topic videos, or clickbait.
+Return ONLY valid JSON matching this schema:
+{"selectedVideoIds": ["id1", "id2", "id3", ...]}`;
+
+  const userQuery = `Student Prompt: "${userPrompt}"\nCandidate Shorts:\n${JSON.stringify(candidateSummary, null, 2)}`;
+
+  try {
+    const rawText = await callLLM(systemPrompt, userQuery, 600, 20000);
+    if (rawText) {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed.selectedVideoIds) && parsed.selectedVideoIds.length > 0) {
+          const candidateMap = new Map(candidates.map((c) => [c.videoId, c]));
+          const selected = [];
+          for (const id of parsed.selectedVideoIds) {
+            if (candidateMap.has(id)) {
+              selected.push(candidateMap.get(id));
+              candidateMap.delete(id);
+            }
+          }
+          if (selected.length >= 2) {
+            return selected;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[LLM Shorts Curation Notice] ${err.message}. Using heuristic ranking.`);
+  }
+
+  // Graceful fallback: rank candidates by semantic keyword relevance to userPrompt
+  const queryTokens = (userPrompt || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  const scored = candidates.map((item) => {
+    const titleLower = (item.title || '').toLowerCase();
+    let score = 0;
+    for (const token of queryTokens) {
+      if (titleLower.includes(token)) score += 2;
+    }
+    return { item, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.item).slice(0, 8);
+};
