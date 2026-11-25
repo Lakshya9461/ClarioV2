@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   BookOpen,
@@ -586,7 +587,7 @@ export const LearningGraph = () => {
                       </p>
                       {questions.length === 0 ? (
                         <p className="text-xs text-slate-500">
-                          Ask a question in the <a href="/" className="text-blue-300 underline">tutor console</a>, then return here to link it.
+                          Ask a question in the <Link to="/" className="text-blue-300 underline">tutor console</Link>, then return here to link it.
                         </p>
                       ) : (
                         <div className="flex flex-col gap-2 sm:flex-row">

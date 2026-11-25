@@ -186,3 +186,18 @@ export const learningGraphApi = {
       body: JSON.stringify(data),
     }),
 };
+
+export const harnessApi = {
+  getGraph: () => request('/harness/graph'),
+  getActiveSession: () => request('/harness/session'),
+  startSession: (goal) =>
+    request('/harness/session', {
+      method: 'POST',
+      body: JSON.stringify({ goal }),
+    }),
+  respond: (id, responseType, data) =>
+    request(`/harness/session/${encodeURIComponent(id)}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ responseType, data }),
+    }),
+};

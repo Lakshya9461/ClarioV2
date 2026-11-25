@@ -16,6 +16,7 @@ import {
   Terminal,
   Video,
   GitBranch,
+  Cpu,
 } from 'lucide-react';
 
 export const Navbar = () => {
@@ -43,6 +44,7 @@ export const Navbar = () => {
 
   const navLinks = [
     { name: 'Console', path: '/', icon: Terminal },
+    { name: 'Harness', path: '/harness', icon: Cpu },
     { name: 'Shorts', path: '/shorts', icon: Video },
     { name: 'History', path: '/history', icon: History },
     { name: 'Study Lists', path: '/study-lists', icon: BookMarked },

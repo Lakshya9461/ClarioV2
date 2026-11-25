@@ -11,6 +11,7 @@ import { StudyLists } from './pages/StudyLists';
 import { Analytics } from './pages/Analytics';
 import { Shorts } from './pages/Shorts';
 import { LearningGraph } from './pages/LearningGraph';
+import { LearningHarness } from './pages/LearningHarness';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 
@@ -30,6 +31,7 @@ function AppLayout() {
           <Route path="/questions/:id" element={<ProtectedRoute><QuestionDetail /></ProtectedRoute>} />
           <Route path="/study-lists" element={<ProtectedRoute><StudyLists /></ProtectedRoute>} />
           <Route path="/learning-map" element={<ProtectedRoute><LearningGraph /></ProtectedRoute>} />
+          <Route path="/harness" element={<ProtectedRoute><LearningHarness /></ProtectedRoute>} />
           <Route
             path="/analytics"
             element={

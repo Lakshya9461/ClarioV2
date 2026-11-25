@@ -149,7 +149,7 @@ const parseLlmJson = (raw) => {
 /**
  * Universal caller supporting OpenAI-compatible and Anthropic endpoints
  */
-const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeoutMs = 12000) => {
+export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeoutMs = 12000) => {
   const apiUrl = process.env.LLM_API_URL || 'https://strata.lakshya9461.in/v1';
   const apiKey = process.env.LLM_API_KEY || '';
   const model = process.env.LLM_MODEL || 'qwen3.8-flash-next-gyro-gyro-m';

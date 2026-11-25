@@ -5,6 +5,9 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 import { connectDB } from './config/db.js';
 import { initRedis, isRedisFallback } from './config/redis.js';
@@ -18,6 +21,7 @@ import feedbackRoutes from './routes/feedbackRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import shortsRoutes from './routes/shortsRoutes.js';
 import learningGraphRoutes from './routes/learningGraphRoutes.js';
+import learningHarnessRoutes from './routes/learningHarnessRoutes.js';
 
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
@@ -103,6 +107,13 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/shorts', shortsRoutes);
 app.use('/api/learning-graph', learningGraphRoutes);
+app.use('/api/harness', learningHarnessRoutes);
+
+// Static reports route (serves answer-me-with-html reports over HTTP to avoid file:/// browser blocks)
+const reportsDir = path.join(os.homedir(), '.answer-me-with-html', 'pages');
+if (fs.existsSync(reportsDir)) {
+  app.use('/reports', express.static(reportsDir));
+}
 
 // Error Handling Middlewares
 app.use(notFound);
