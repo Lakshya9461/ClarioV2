@@ -313,7 +313,7 @@ export const submitResponse = async (req, res, next) => {
 
         // Update knowledge graph tags and chains
         const newChains = [];
-        const solidProps = session.teaching.nodes
+        const solidProps = (session.teaching?.nodes || [])
           .filter((n) => n.status === 'solid')
           .map((n) => n.predictQuestion?.conceptClaim || n.name);
 
@@ -325,7 +325,7 @@ export const submitResponse = async (req, res, next) => {
         }
 
         updateKnowledgeGraphPropositions(
-          session.teaching.nodes.map((n) => ({
+          (session.teaching?.nodes || []).map((n) => ({
             status: n.status,
             topic: session.goal,
             claim: n.predictQuestion?.conceptClaim || n.name,

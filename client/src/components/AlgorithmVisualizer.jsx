@@ -81,7 +81,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Do not intercept if user is typing in form controls
-      if (e.target.matches('input, textarea, select')) return;
+      if (e.target?.matches?.('input, textarea, select')) return;
 
       if (e.key === 'ArrowRight' || e.key === 'l') {
         e.preventDefault();

@@ -61,13 +61,13 @@ export const SlideDeckView = ({
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !e.target.matches('textarea, input'))) {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !e.target?.matches?.('textarea, input'))) {
         e.preventDefault();
         nextSlide();
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault();
         prevSlide();
-      } else if (e.key.toLowerCase() === 'f' && !e.target.matches('textarea, input')) {
+      } else if (e.key.toLowerCase() === 'f' && !e.target?.matches?.('textarea, input')) {
         e.preventDefault();
         setIsFullscreen((prev) => !prev);
       } else if (e.key === 'Escape' && isFullscreen) {

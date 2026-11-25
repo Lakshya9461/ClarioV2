@@ -438,6 +438,7 @@ export const generateBinarySearchTrace = (customArray, target = 32) => {
  * 4. Recursion & Call Stack Trace Generator (Fibonacci / Factorial)
  */
 export const generateRecursionTrace = (n = 4) => {
+  const safeN = Math.max(1, Math.min(Number(n) || 4, 6));
   const steps = [];
   let stepCount = 1;
 
@@ -539,7 +540,7 @@ export const generateRecursionTrace = (n = 4) => {
     return result;
   };
 
-  simulateFib(n);
+  simulateFib(safeN);
 
   return {
     algorithm: 'recursion',
@@ -951,7 +952,7 @@ export const generateCpuRamTrace = () => {
  * and generates the appropriate visualizer trace
  */
 export const detectAndGenerateVisualizationTrace = (text = '') => {
-  const t = (text || '').toLowerCase();
+  const t = typeof text === 'string' ? text.toLowerCase() : String(text || '').toLowerCase();
 
   // 0. Hardware / Architecture: CPU vs RAM, Memory Hierarchy, Cache
   if (
