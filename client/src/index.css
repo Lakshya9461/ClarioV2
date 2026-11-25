@@ -39,11 +39,27 @@ html, body {
   overflow-x: clip;
   margin: 0;
   padding: 0;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   font-family: var(--font-sans);
   background-color: var(--surface-base);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ═══════════════════════════════════════════
+   ADAPTIVE COARSE POINTER (TOUCH SCREENS)
+═══════════════════════════════════════════ */
+@media (pointer: coarse) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-amber {
+    min-height: 44px;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
 }
 
 h1, h2, h3, h4, .font-display {

@@ -622,7 +622,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
         </div>
 
         {/* Step Scrubber Slider */}
-        <div className="flex-1 max-w-xs sm:max-w-md mx-2 flex items-center space-x-3">
+        <div className="flex-1 min-w-[140px] max-w-xs sm:max-w-md mx-1 sm:mx-2 flex items-center space-x-2 sm:space-x-3">
           <input
             type="range"
             min={0}
@@ -637,7 +637,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
               setIsPlaying(false);
               setCurrentStepIndex(Number(e.target.value));
             }}
-            className="w-full accent-blue-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="w-full accent-blue-500 cursor-pointer h-2 sm:h-1.5 bg-slate-800 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none touch-pan-x"
           />
           <span className="text-xs font-mono text-slate-400 tabular-nums shrink-0">
             {currentStepIndex + 1}/{steps.length}

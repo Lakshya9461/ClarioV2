@@ -57,7 +57,10 @@ function AppLayout() {
 
       {/* Footer (hidden on immersive Shorts page) */}
       {!isShorts && (
-        <footer className="border-t border-slate-800 bg-[#06090f] py-6 mt-16">
+        <footer
+          className="border-t border-slate-800 bg-[#06090f] py-6 mt-16"
+          style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <div className="w-5 h-5 rounded bg-blue-600 flex items-center justify-center shadow-sm">
