@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useStreamAnswer } from '../hooks/useStreamAnswer';
 import { QuestionForm } from '../components/QuestionForm';
@@ -22,9 +23,16 @@ const DOMAIN_PILLARS = [
 
 export const Home = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const { state, ask, askFollowUp, simplify, reset } = useStreamAnswer();
   const isWorking = state.status === 'ASKING' || state.status === 'STREAMING';
   const hasActiveSession = state.status !== 'IDLE';
+
+  useEffect(() => {
+    if (location.state?.autoAsk && state.status === 'IDLE') {
+      ask(location.state.autoAsk);
+    }
+  }, [location.state?.autoAsk]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">

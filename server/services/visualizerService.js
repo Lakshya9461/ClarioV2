@@ -808,11 +808,162 @@ export const generateDFSTrace = () => {
 };
 
 /**
+ * 7. CPU vs RAM / Memory Hierarchy Execution Trace
+ */
+export const generateCpuRamTrace = () => {
+  const pseudocode = [
+    '1. Disk Storage -> RAM: OS loads application bytecode and working data into volatile RAM',
+    '2. Fetch: CPU Program Counter (PC) requests next instruction over memory bus from RAM address',
+    '3. L1/L2 Cache Staging: High-speed SRAM caches instruction (0.5-1ns latency vs 60ns RAM)',
+    '4. Decode: Control Unit decodes opcode (e.g. ADD R1, R2, R3)',
+    '5. Execute: Arithmetic Logic Unit (ALU) computes result at gigahertz clock cycle (0.3ns)',
+    '6. Write-Back: CPU writes updated state back to RAM working buffer',
+    '7. Power Interruption Test: RAM capacitors drain (data lost); Disk non-volatile blocks remain intact',
+  ];
+
+  const steps = [
+    {
+      stepNumber: 1,
+      description: 'Program is stored on persistent non-volatile disk. CPU cannot directly address disk storage at execution speeds.',
+      codeLine: 0,
+      state: {
+        activeComponent: 'Storage Drive (SSD/HDD)',
+        source: 'Storage Drive',
+        target: 'RAM',
+        busActive: true,
+        actionMessage: 'Loading program instructions and working memory into RAM workspace',
+        hardwareState: {
+          cpu: { status: 'Idle', registers: { R1: 0, R2: 0, R3: 0 }, pc: '0x0000' },
+          cache: { status: 'Empty', latency: '~1ns' },
+          ram: { status: 'Loading', allocated: '64MB', latency: '~60ns', volatile: true },
+          disk: { status: 'Reading', persistent: true, latency: '~100,000ns' },
+        },
+      },
+    },
+    {
+      stepNumber: 2,
+      description: 'Program now loaded into volatile RAM. RAM acts as the active scratchpad for fast read/write access.',
+      codeLine: 1,
+      state: {
+        activeComponent: 'RAM',
+        source: 'RAM',
+        target: 'CPU Bus',
+        busActive: true,
+        actionMessage: 'CPU requests instruction at address 0x0040 over system bus',
+        hardwareState: {
+          cpu: { status: 'Fetching', registers: { R1: 0, R2: 0, R3: 0 }, pc: '0x0040' },
+          cache: { status: 'Miss', latency: '~1ns' },
+          ram: { status: 'Serving Address 0x0040', allocated: '64MB', latency: '~60ns', volatile: true },
+          disk: { status: 'Idle', persistent: true, latency: '~100,000ns' },
+        },
+      },
+    },
+    {
+      stepNumber: 3,
+      description: 'CPU Cache stages the fetched line from RAM. L1 cache allows next instructions to be fetched with sub-nanosecond latency.',
+      codeLine: 2,
+      state: {
+        activeComponent: 'L1/L2 Cache',
+        source: 'RAM',
+        target: 'CPU L1 Cache',
+        busActive: false,
+        actionMessage: 'Cached instruction line loaded into CPU on-die SRAM',
+        hardwareState: {
+          cpu: { status: 'Decoding', registers: { R1: 42, R2: 58, R3: 0 }, pc: '0x0040' },
+          cache: { status: 'Hit (0.9ns)', latency: '~1ns' },
+          ram: { status: 'Standby', allocated: '64MB', latency: '~60ns', volatile: true },
+          disk: { status: 'Idle', persistent: true, latency: '~100,000ns' },
+        },
+      },
+    },
+    {
+      stepNumber: 4,
+      description: 'Control Unit decodes instruction: ADD R1, R2 -> R3. ALU executes calculation in ~0.3ns clock cycle.',
+      codeLine: 4,
+      state: {
+        activeComponent: 'CPU (ALU & Registers)',
+        source: 'Registers R1, R2',
+        target: 'Register R3',
+        busActive: false,
+        actionMessage: 'ALU computes: 42 + 58 = 100 in CPU register R3',
+        hardwareState: {
+          cpu: { status: 'Executing ALU', registers: { R1: 42, R2: 58, R3: 100 }, pc: '0x0044' },
+          cache: { status: 'Hit', latency: '~1ns' },
+          ram: { status: 'Standby', allocated: '64MB', latency: '~60ns', volatile: true },
+          disk: { status: 'Idle', persistent: true, latency: '~100,000ns' },
+        },
+      },
+    },
+    {
+      stepNumber: 5,
+      description: 'Write-Back: The calculated result in CPU register is written back to RAM address 0x0080 for application use.',
+      codeLine: 5,
+      state: {
+        activeComponent: 'Memory Bus & RAM',
+        source: 'CPU Register R3',
+        target: 'RAM 0x0080',
+        busActive: true,
+        actionMessage: 'Writing result (100) back to RAM buffer over data bus',
+        hardwareState: {
+          cpu: { status: 'Writeback Complete', registers: { R1: 42, R2: 58, R3: 100 }, pc: '0x0048' },
+          cache: { status: 'Dirty Line Flushed', latency: '~1ns' },
+          ram: { status: 'Buffer Updated (Val: 100)', allocated: '64MB', latency: '~60ns', volatile: true },
+          disk: { status: 'Idle', persistent: true, latency: '~100,000ns' },
+        },
+      },
+    },
+    {
+      stepNumber: 6,
+      description: 'Volatility Demonstration: Power loss cut. RAM capacitors instantly discharge; non-volatile disk retains all stored records.',
+      codeLine: 6,
+      state: {
+        activeComponent: 'RAM vs Disk Volatility',
+        source: 'Power Interruption',
+        target: 'System State',
+        busActive: false,
+        actionMessage: 'RAM data wiped (volatile); Disk data preserved (non-volatile)',
+        hardwareState: {
+          cpu: { status: 'Powered Off', registers: { R1: 0, R2: 0, R3: 0 }, pc: '0x0000' },
+          cache: { status: 'Lost (Volatile)', latency: 'N/A' },
+          ram: { status: 'RESET / CLEARED (Volatile)', allocated: '0MB', latency: 'N/A', volatile: true },
+          disk: { status: 'INTACT / PRESERVED (Non-Volatile)', persistent: true, latency: 'Preserved' },
+        },
+      },
+    },
+  ];
+
+  return {
+    algorithm: 'cpu_vs_ram',
+    title: 'CPU Execution Cycle & RAM Architecture',
+    category: 'Architecture & Systems',
+    complexity: {
+      time: 'CPU: ~0.3ns | L1: ~1ns | RAM: ~60ns | Disk: ~100,000ns',
+      space: 'RAM: Volatile Working Buffer | Disk: Non-Volatile Storage',
+      stable: true,
+    },
+    pseudocode,
+    steps,
+  };
+};
+
+/**
  * Detects if a question/prompt is asking about an algorithm or data structure
  * and generates the appropriate visualizer trace
  */
 export const detectAndGenerateVisualizationTrace = (text = '') => {
   const t = (text || '').toLowerCase();
+
+  // 0. Hardware / Architecture: CPU vs RAM, Memory Hierarchy, Cache
+  if (
+    t.includes('cpu') ||
+    t.includes('ram') ||
+    t.includes('memory hierarchy') ||
+    t.includes('hardware') ||
+    t.includes('cache') ||
+    t.includes('register')
+  ) {
+    return generateCpuRamTrace();
+  }
 
   // 1. Quicksort
   if (t.includes('quicksort') || t.includes('quick sort')) {

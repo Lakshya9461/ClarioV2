@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { harnessApi } from '../services/api';
+import { AlgorithmVisualizer } from '../components/AlgorithmVisualizer';
 import {
   Terminal,
   Cpu,
@@ -12,9 +14,15 @@ import {
   Send,
   Loader2,
   Database,
+  Activity,
+  Sparkles,
+  Presentation,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export const LearningHarness = () => {
+  const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [knowledgeGraph, setKnowledgeGraph] = useState({ propositions: [], chains: [] });
   const [goalInput, setGoalInput] = useState('');
@@ -22,6 +30,8 @@ export const LearningHarness = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [isStaleSession, setIsStaleSession] = useState(false);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState('dialogue'); // 'dialogue' | 'visualizer' | 'artifacts'
+  const [copiedGraph, setCopiedGraph] = useState(false);
 
   // Form states for inputs
   const [selectedOption, setSelectedOption] = useState('');
@@ -231,6 +241,13 @@ export const LearningHarness = () => {
     }
   };
 
+  const handleCopyKnowledgeGraph = () => {
+    const markdown = `# Clario Knowledge Graph\n\n## Propositions\n${knowledgeGraph.propositions?.map((p) => `- [${p.status}] [topic: ${p.topic}] ${p.claim}`).join('\n') || ''}\n\n## Chains\n${knowledgeGraph.chains?.map((c) => `- ${c.premises?.join(' + ')} -> ${c.conclusion}`).join('\n') || ''}\n`;
+    navigator.clipboard.writeText(markdown);
+    setCopiedGraph(true);
+    setTimeout(() => setCopiedGraph(false), 2000);
+  };
+
   const currentProbe = session?.phase === 'MEASURE' ? session.probes?.[session.currentProbeIndex] : null;
   const currentTeachingNode = session?.phase === 'TEACH' ? session.teaching?.nodes?.[session.teaching?.currentNodeIndex] : null;
   const currentPracticeProblem = session?.phase === 'PRACTICE' ? session.practice?.problems?.[session.practice?.currentProblemIndex] : null;
@@ -296,11 +313,232 @@ export const LearningHarness = () => {
         </div>
       )}
 
+      {/* ── Workspace Tab Switcher (When Session Active) ── */}
+      {session && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setActiveWorkspaceTab('dialogue')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                activeWorkspaceTab === 'dialogue'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'bg-[#0e1424] text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Socratic Dialogue ({session.phase})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveWorkspaceTab('visualizer')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                activeWorkspaceTab === 'visualizer'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-500/20'
+                  : 'bg-[#0e1424] text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Interactive Visualizer</span>
+              {session.visualizationTrace && (
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveWorkspaceTab('artifacts')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                activeWorkspaceTab === 'artifacts'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                  : 'bg-[#0e1424] text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Created Propositions ({knowledgeGraph.propositions?.length || 0})</span>
+            </button>
+          </div>
+
+          <button
+            onClick={() => navigate('/', { state: { autoAsk: session.goal } })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/30 to-purple-600/30 hover:from-blue-600/50 hover:to-purple-600/50 border border-blue-500/40 text-blue-200 text-xs font-sans font-bold transition-all"
+            title="Generate full slide deck presentation and deep dive on Home"
+          >
+            <Presentation className="w-3.5 h-3.5 text-blue-400" />
+            <span>✨ Synthesize Slides & Deep Dive</span>
+          </button>
+        </div>
+      )}
+
       {/* ── Main Work Area ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Interactive Harness Console */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* 1. START / GOAL INPUT */}
+      {activeWorkspaceTab === 'visualizer' && session ? (
+        <div className="space-y-4 animate-fade-in">
+          <div className="p-4 rounded-xl bg-[#0c121e] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-cyan-400" />
+                  <span>Interactive Algorithm & Architecture Simulation</span>
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold">
+                  LIVE VISUALIZER
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-sans mt-1">
+                Visualizing state changes, call stacks, memory models, and execution flow for:{' '}
+                <strong className="text-cyan-200 font-mono">{session.goal}</strong>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveWorkspaceTab('dialogue')}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold transition-colors flex items-center gap-1.5"
+              >
+                <Terminal className="w-3.5 h-3.5" />
+                <span>Resume Socratic Dialogue</span>
+              </button>
+            </div>
+          </div>
+
+          <AlgorithmVisualizer
+            trace={session.visualizationTrace}
+            customPrompt={session.goal}
+          />
+        </div>
+      ) : activeWorkspaceTab === 'artifacts' && session ? (
+        <div className="space-y-4 animate-fade-in">
+          <div className="p-4 rounded-xl bg-[#0c121e] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-base font-bold text-white">
+                  Created Knowledge Graph Propositions (./knowledge-graph.md)
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400 font-sans mt-1">
+                Propositions, invariant claims, and reasoning chains constructed by Clario during your learning sessions.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyKnowledgeGraph}
+                className="px-3 py-1.5 rounded-lg bg-[#141e30] hover:bg-[#1a273e] text-slate-200 border border-slate-700 text-xs font-mono font-bold flex items-center gap-1.5 transition-colors"
+              >
+                {copiedGraph ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedGraph ? 'Copied Markdown!' : 'Copy Markdown'}</span>
+              </button>
+              <button
+                onClick={() => setActiveWorkspaceTab('dialogue')}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold transition-colors flex items-center gap-1.5"
+              >
+                <Terminal className="w-3.5 h-3.5" />
+                <span>Resume Dialogue</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Propositions Grid */}
+            <div className="panel-base p-5 bg-[#0e1424] border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
+                  Propositions ({knowledgeGraph.propositions?.length || 0})
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">Claims & Invariants</span>
+              </div>
+              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                {knowledgeGraph.propositions?.length === 0 ? (
+                  <div className="text-xs text-slate-500 italic p-6 text-center">
+                    No propositions created yet. Walk through a lesson to construct new knowledge claims.
+                  </div>
+                ) : (
+                  knowledgeGraph.propositions.map((p, idx) => {
+                    const tagColors = {
+                      solid: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                      shaky: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                      weak: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                    };
+                    const color = tagColors[p.status] || tagColors.shaky;
+                    return (
+                      <div key={idx} className="p-3 rounded-lg bg-[#070b13] border border-slate-800 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[10px] px-2 py-0.5 rounded border font-mono font-bold uppercase ${color}`}>
+                            [{p.status}]
+                          </span>
+                          <span className="text-[10px] text-blue-400 font-mono">{p.topic}</span>
+                        </div>
+                        <p className="text-xs text-white font-sans leading-relaxed">{p.claim}</p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Chains Grid */}
+            <div className="panel-base p-5 bg-[#0e1424] border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
+                  Reasoning Chains ({knowledgeGraph.chains?.length || 0})
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">Premises -&gt; Conclusion</span>
+              </div>
+              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                {knowledgeGraph.chains?.length === 0 ? (
+                  <div className="text-xs text-slate-500 italic p-6 text-center">
+                    No multi-premise reasoning chains chained yet.
+                  </div>
+                ) : (
+                  knowledgeGraph.chains.map((c, idx) => (
+                    <div key={idx} className="p-3 rounded-lg bg-[#070b13] border border-slate-800 space-y-2 text-xs font-mono">
+                      <div className="text-slate-400 font-semibold">Premises:</div>
+                      <div className="text-blue-300 pl-2 border-l border-blue-500/30 leading-relaxed">
+                        {c.premises?.join(' + ')}
+                      </div>
+                      <div className="text-slate-400 font-semibold flex items-center gap-1.5 pt-1">
+                        <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Conclusion:</span>
+                      </div>
+                      <div className="text-emerald-300 pl-2 border-l border-emerald-500/30 leading-relaxed font-bold">
+                        {c.conclusion}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left 2 Cols: Interactive Harness Console */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Active Simulation Notification Banner */}
+            {session?.visualizationTrace && (
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/60 to-blue-950/60 border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-2.5 text-cyan-200">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/30">
+                    <Activity className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white flex items-center gap-1.5">
+                      <span>Interactive Visualizer Created</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300">ANIMATED</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300 font-sans mt-0.5">
+                      {session.visualizationTrace.title} ({session.visualizationTrace.steps?.length || 0} interactive steps)
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveWorkspaceTab('visualizer')}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shrink-0 transition-colors shadow-sm"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Launch Simulation</span>
+                </button>
+              </div>
+            )}
+
+            {/* 1. START / GOAL INPUT */}
           {!session && (
             <div className="panel-base p-6 bg-[#0e1424] border border-slate-800 space-y-4">
               <div className="space-y-1">
@@ -504,6 +742,20 @@ export const LearningHarness = () => {
                     </div>
                   )}
                   <p className="leading-relaxed">{lastFeedback.explanation}</p>
+
+                  {lastFeedback.action !== 'repair' && (
+                    <div className="mt-2 p-2.5 rounded bg-black/50 border border-emerald-500/30 text-[11px] font-mono space-y-1">
+                      <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>PROPOSITION CREATED & RECORDED TO ./knowledge-graph.md</span>
+                      </div>
+                      <div className="text-slate-200">
+                        {currentTeachingNode.predictQuestion?.conceptClaim
+                          ? `- [solid] [topic: ${session.goal}] ${currentTeachingNode.predictQuestion.conceptClaim}`
+                          : `- [solid] [topic: ${session.goal}] ${currentTeachingNode.name} invariant verified.`}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -750,8 +1002,9 @@ export const LearningHarness = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 };
 
 export default LearningHarness;

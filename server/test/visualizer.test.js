@@ -8,6 +8,7 @@ import {
   generateRecursionTrace,
   generateBFSTrace,
   generateDFSTrace,
+  generateCpuRamTrace,
 } from '../services/visualizerService.js';
 
 describe('Algorithm Visualizer Service', () => {
@@ -76,6 +77,15 @@ describe('Algorithm Visualizer Service', () => {
     assert.ok(stepWithStack);
     const lastStep = trace.steps[trace.steps.length - 1];
     assert.strictEqual(lastStep.state.action, 'DONE');
+  });
+
+  it('should generate valid CPU vs RAM architecture trace', () => {
+    const trace = generateCpuRamTrace();
+    assert.strictEqual(trace.algorithm, 'cpu_vs_ram');
+    assert.ok(Array.isArray(trace.steps));
+    assert.ok(trace.steps.length >= 6);
+    assert.ok(trace.steps[0].state.hardwareState.cpu);
+    assert.ok(trace.steps[0].state.hardwareState.ram);
   });
 
   it('should detect algorithm intent accurately from prompt', () => {

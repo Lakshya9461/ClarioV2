@@ -400,6 +400,107 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
               </div>
             </div>
           )}
+
+          {/* 4. Hardware / Architecture View (CPU vs RAM & Memory Hierarchy) */}
+          {state.hardwareState && (
+            <div className="flex-1 flex flex-col justify-center my-4 p-4 rounded-xl bg-[#0a0f1a] border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                <span className="flex items-center gap-1.5 text-cyan-400 font-bold uppercase tracking-wider">
+                  <Activity className="w-4 h-4 text-cyan-400" /> Hardware Execution State & Memory Hierarchy
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Active Bus: <strong className={state.busActive ? 'text-emerald-400' : 'text-slate-500'}>{state.busActive ? 'ACTIVE TRANSFER' : 'INTERNAL ALU'}</strong>
+                </span>
+              </div>
+
+              {/* Data Flow Bus Indicator */}
+              <div className="p-2.5 rounded-lg bg-[#070b14] border border-slate-800/90 text-xs font-mono flex items-center justify-between">
+                <span className="text-slate-400">Data Bus Transfer:</span>
+                <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                  <span>{state.source || 'Storage'}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+                  <span className="text-emerald-300">{state.target || 'CPU'}</span>
+                </div>
+              </div>
+
+              {/* 4-Stage Hierarchy Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                {/* 1. CPU */}
+                <div className={`p-3 rounded-xl border transition-all ${
+                  state.activeComponent?.includes('CPU')
+                    ? 'bg-blue-600/20 border-blue-500 shadow-md shadow-blue-500/20'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-white uppercase font-mono">CPU Core</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">~0.3ns</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono space-y-0.5">
+                    <div>Status: <strong className="text-white">{state.hardwareState.cpu?.status}</strong></div>
+                    <div>PC: <span className="text-blue-300 font-bold">{state.hardwareState.cpu?.pc}</span></div>
+                    <div className="text-[9px] text-slate-500 pt-1">
+                      Regs: R1={state.hardwareState.cpu?.registers?.R1}, R2={state.hardwareState.cpu?.registers?.R2}, R3={state.hardwareState.cpu?.registers?.R3}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Cache */}
+                <div className={`p-3 rounded-xl border transition-all ${
+                  state.activeComponent?.includes('Cache')
+                    ? 'bg-purple-600/20 border-purple-500 shadow-md shadow-purple-500/20'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-white uppercase font-mono">L1/L2 Cache</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">~1ns</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono space-y-0.5">
+                    <div>State: <strong className="text-purple-300">{state.hardwareState.cache?.status}</strong></div>
+                    <div>Tech: <span className="text-slate-300">Static RAM (SRAM)</span></div>
+                    <div className="text-[9px] text-purple-400/80 pt-1">On-die silicon speed</div>
+                  </div>
+                </div>
+
+                {/* 3. RAM */}
+                <div className={`p-3 rounded-xl border transition-all ${
+                  state.activeComponent?.includes('RAM')
+                    ? 'bg-emerald-600/20 border-emerald-500 shadow-md shadow-emerald-500/20'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-white uppercase font-mono">System RAM</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">~60ns</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono space-y-0.5">
+                    <div>Buffer: <strong className="text-emerald-300">{state.hardwareState.ram?.status}</strong></div>
+                    <div className="flex items-center gap-1">
+                      Type: <span className="px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[9px] font-bold">VOLATILE</span>
+                    </div>
+                    <div className="text-[9px] text-slate-500 pt-1">Capacitor charge refresh</div>
+                  </div>
+                </div>
+
+                {/* 4. Storage Disk */}
+                <div className={`p-3 rounded-xl border transition-all ${
+                  state.activeComponent?.includes('Storage') || state.activeComponent?.includes('Disk')
+                    ? 'bg-amber-600/20 border-amber-500 shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-white uppercase font-mono">Storage (SSD)</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">100k ns</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono space-y-0.5">
+                    <div>State: <strong className="text-amber-300">{state.hardwareState.disk?.status}</strong></div>
+                    <div className="flex items-center gap-1">
+                      Type: <span className="px-1 py-0.2 rounded bg-blue-500/20 text-blue-300 text-[9px] font-bold">NON-VOLATILE</span>
+                    </div>
+                    <div className="text-[9px] text-slate-500 pt-1">Persistent NAND flash</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Right: Pseudocode & Step Engine (Col 5) ── */}

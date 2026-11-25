@@ -116,6 +116,10 @@ const harnessSessionSchema = new mongoose.Schema(
         revisitWhen: String,
       },
     },
+    visualizationTrace: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,

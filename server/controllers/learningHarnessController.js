@@ -1,4 +1,5 @@
 import HarnessSession from '../models/HarnessSession.js';
+import { detectAndGenerateVisualizationTrace } from '../services/visualizerService.js';
 import {
   readKnowledgeGraph,
   updateKnowledgeGraphPropositions,
@@ -51,6 +52,7 @@ export const startSession = async (req, res, next) => {
     const trimmedGoal = goal.trim();
     const graph = readKnowledgeGraph();
     const probes = await generatePrerequisiteProbes(trimmedGoal, graph);
+    const visualizationTrace = detectAndGenerateVisualizationTrace(trimmedGoal);
 
     const session = await HarnessSession.create({
       userId: req.user._id,
@@ -58,6 +60,7 @@ export const startSession = async (req, res, next) => {
       phase: 'MEASURE',
       currentProbeIndex: 0,
       probes,
+      visualizationTrace,
     });
 
     res.status(201).json({ ok: true, session });
