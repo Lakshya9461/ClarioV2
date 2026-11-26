@@ -29,9 +29,11 @@ const streamTextInChunks = async (text, res, chunkSize = 4, delayMs = 25) => {
  * POST /api/questions
  */
 export const askQuestion = async (req, res, next) => {
-  const { question: rawQuestion, parentQuestionId } = req.body;
+  const { question: rawQuestion, parentQuestionId, modelConfig } = req.body;
+  const customModelConfig = modelConfig || req.user?.customModel || null;
+
   if (parentQuestionId) {
-    return handleFollowUpStream(req, res, parentQuestionId, rawQuestion);
+    return handleFollowUpStream(req, res, parentQuestionId, rawQuestion, customModelConfig);
   }
   const userId = req.user._id;
 
@@ -108,7 +110,7 @@ export const askQuestion = async (req, res, next) => {
       })}\n\n`
     );
 
-    const refined = await refinePrompt(rawQuestion);
+    const refined = await refinePrompt(rawQuestion, customModelConfig);
 
     // Send refined prompt immediately to student UI
     res.write(`event: refined_prompt\ndata: ${JSON.stringify({ refinedPrompt: refined })}\n\n`);
@@ -123,7 +125,7 @@ export const askQuestion = async (req, res, next) => {
       })}\n\n`
     );
 
-    const structuredAnswer = await generateStructuredAnswer(refined, rawQuestion);
+    const structuredAnswer = await generateStructuredAnswer(refined, rawQuestion, customModelConfig);
 
     // 4. Stream explanation content progressively
     await streamTextInChunks(structuredAnswer.explanation, res, 4, 30);
@@ -182,7 +184,7 @@ export const askQuestion = async (req, res, next) => {
  * Handle Streaming Follow-up Question in Existing Conversation Thread (ChatGPT UX)
  * POST /api/questions/:id/follow-up or POST /api/questions with parentQuestionId
  */
-export const handleFollowUpStream = async (req, res, parentQuestionId, followUpText) => {
+export const handleFollowUpStream = async (req, res, parentQuestionId, followUpText, customModelConfig = null) => {
   const userId = req.user._id;
 
   if (!res.headersSent) {
@@ -224,7 +226,8 @@ export const handleFollowUpStream = async (req, res, parentQuestionId, followUpT
     const followUpAnswer = await generateFollowUpAnswer(
       followUpText,
       parentQuestion.followUps,
-      parentQuestion.rawQuestion
+      parentQuestion.rawQuestion,
+      customModelConfig
     );
 
     // Stream the content progressively
@@ -281,8 +284,9 @@ export const handleFollowUpStream = async (req, res, parentQuestionId, followUpT
 
 export const askFollowUp = async (req, res, next) => {
   const { id } = req.params;
-  const { question: followUpText } = req.body;
-  return handleFollowUpStream(req, res, id, followUpText);
+  const { question: followUpText, modelConfig } = req.body;
+  const customModelConfig = modelConfig || req.user?.customModel || null;
+  return handleFollowUpStream(req, res, id, followUpText, customModelConfig);
 };
 
 /**
@@ -291,14 +295,15 @@ export const askFollowUp = async (req, res, next) => {
  */
 export const simplifyQuestion = async (req, res, next) => {
   try {
-    const { questionId } = req.body;
+    const { questionId, modelConfig } = req.body;
+    const customModelConfig = modelConfig || req.user?.customModel || null;
 
     const question = await Question.findById(questionId);
     if (!question) {
       return res.status(404).json({ success: false, message: 'Question not found' });
     }
 
-    if (question.simplifiedVersion) {
+    if (question.simplifiedVersion && !customModelConfig?.enabled) {
       return res.status(200).json({
         success: true,
         simplified: question.simplifiedVersion,
@@ -306,7 +311,7 @@ export const simplifyQuestion = async (req, res, next) => {
       });
     }
 
-    const simplified = await simplifyExplanation(question.explanation, question.rawQuestion);
+    const simplified = await simplifyExplanation(question.explanation, question.rawQuestion, customModelConfig);
 
     question.isSimplified = true;
     question.simplifiedVersion = simplified;

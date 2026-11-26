@@ -1,9 +1,11 @@
 import { useReducer, useCallback } from 'react';
 import { answerReducer, initialState } from '../reducers/answerReducer';
 import { questionApi } from '../services/api';
+import { useModel } from '../context/ModelContext';
 
 export const useStreamAnswer = () => {
   const [state, dispatch] = useReducer(answerReducer, initialState);
+  const { modelConfig, isCustomActive } = useModel();
 
   const ask = useCallback(async (rawQuestion) => {
     if (!rawQuestion || !rawQuestion.trim()) return;
@@ -17,7 +19,10 @@ export const useStreamAnswer = () => {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
         },
-        body: JSON.stringify({ question: rawQuestion }),
+        body: JSON.stringify({
+          question: rawQuestion,
+          ...(isCustomActive && modelConfig?.enabled ? { modelConfig } : {}),
+        }),
         credentials: 'include',
       });
 
@@ -131,7 +136,10 @@ export const useStreamAnswer = () => {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
         },
-        body: JSON.stringify({ question: followUpText.trim() }),
+        body: JSON.stringify({
+          question: followUpText.trim(),
+          ...(isCustomActive && modelConfig?.enabled ? { modelConfig } : {}),
+        }),
         credentials: 'include',
       });
 
@@ -219,7 +227,10 @@ export const useStreamAnswer = () => {
 
     dispatch({ type: 'START_SIMPLIFY' });
     try {
-      const res = await questionApi.simplifyQuestion(state.questionId);
+      const res = await questionApi.simplifyQuestion(
+        state.questionId,
+        isCustomActive && modelConfig?.enabled ? modelConfig : undefined
+      );
       if (res.success && res.simplified) {
         dispatch({
           type: 'FINISH_SIMPLIFY',

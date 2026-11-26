@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useModel } from '../context/ModelContext';
 import {
   Sparkles,
   History,
@@ -21,6 +22,7 @@ import {
 
 export const Navbar = () => {
   const { user, logout, isTeacher, isAdmin } = useAuth();
+  const { modelConfig, isCustomActive, activeModelLabel, setIsModalOpen } = useModel();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -129,7 +131,25 @@ export const Navbar = () => {
           )}
 
           {/* ── Right: User Profile & Actions ── */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
+            {/* Model Selector / Config Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              title={`Active Model: ${activeModelLabel}. Click to switch or configure custom LLM.`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                isCustomActive
+                  ? 'bg-blue-950/60 text-blue-300 border-blue-500/40 hover:bg-blue-900/60 hover:border-blue-500/60'
+                  : 'bg-[#101726] text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <Cpu className={`w-3.5 h-3.5 ${isCustomActive ? 'text-blue-400' : 'text-slate-500'}`} />
+              <span className="max-w-[110px] truncate">{isCustomActive ? modelConfig.model : 'System Model'}</span>
+              {isCustomActive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm" />
+              )}
+            </button>
+
             {user ? (
               <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
                 <div className="text-right">
@@ -236,6 +256,22 @@ export const Navbar = () => {
               </>
             )}
           </div>
+
+          {/* Mobile Model Config Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setIsModalOpen(true);
+            }}
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-mono bg-[#141d2e] border border-slate-800 text-slate-300 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+          >
+            <span className="flex items-center gap-2">
+              <Cpu className={`w-4 h-4 ${isCustomActive ? 'text-blue-400' : 'text-slate-400'}`} />
+              <span>Model: {isCustomActive ? `${modelConfig.provider} (${modelConfig.model})` : 'System Default'}</span>
+            </span>
+            <span className="text-[11px] text-blue-400 font-sans">Configure</span>
+          </button>
 
           {user && (
             <div className="pt-2 border-t border-slate-800">

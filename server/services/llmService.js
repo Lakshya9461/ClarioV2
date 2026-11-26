@@ -149,11 +149,37 @@ const parseLlmJson = (raw) => {
 /**
  * Universal caller supporting OpenAI-compatible and Anthropic endpoints
  */
-export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeoutMs = 12000) => {
-  const apiUrl = process.env.LLM_API_URL || 'https://strata.lakshya9461.in/v1';
-  const apiKey = process.env.LLM_API_KEY || '';
-  const model = process.env.LLM_MODEL || 'qwen3.8-flash-next-gyro-gyro-m';
-  const isAnthropic = apiUrl.endsWith('/messages');
+export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeoutMs = 12000, customConfig = null) => {
+  let apiUrl = process.env.LLM_API_URL || 'https://strata.lakshya9461.in/v1';
+  let apiKey = process.env.LLM_API_KEY || '';
+  let model = process.env.LLM_MODEL || 'qwen3.8-flash-next-gyro-gyro-m';
+  let isAnthropic = false;
+
+  // Check if custom user-configured model is enabled and provided
+  if (customConfig && customConfig.enabled && customConfig.model && customConfig.model.trim()) {
+    const prov = (customConfig.provider || 'openai').toLowerCase();
+    model = customConfig.model.trim();
+    apiKey = customConfig.apiKey || '';
+
+    if (prov === 'anthropic') {
+      isAnthropic = true;
+      apiUrl = customConfig.apiUrl?.trim() || 'https://api.anthropic.com/v1/messages';
+    } else if (prov === 'gemini') {
+      apiUrl = customConfig.apiUrl?.trim() || 'https://generativelanguage.googleapis.com/v1beta/openai';
+    } else if (prov === 'groq') {
+      apiUrl = customConfig.apiUrl?.trim() || 'https://api.groq.com/openai/v1';
+    } else if (prov === 'deepseek') {
+      apiUrl = customConfig.apiUrl?.trim() || 'https://api.deepseek.com/v1';
+    } else if (prov === 'ollama') {
+      apiUrl = customConfig.apiUrl?.trim() || 'http://localhost:11434/v1';
+    } else {
+      // openai or custom provider
+      apiUrl = customConfig.apiUrl?.trim() || 'https://api.openai.com/v1';
+    }
+  } else {
+    isAnthropic = apiUrl.endsWith('/messages');
+  }
+
   let targetUrl = apiUrl;
   if (!isAnthropic && !targetUrl.endsWith('/chat/completions')) {
     targetUrl = targetUrl.replace(/\/+$/, '') + '/chat/completions';
@@ -165,7 +191,7 @@ export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeou
 
   let body;
   if (isAnthropic) {
-    headers['x-api-key'] = apiKey;
+    if (apiKey) headers['x-api-key'] = apiKey;
     headers['anthropic-version'] = '2023-06-01';
     body = {
       model,
@@ -174,7 +200,7 @@ export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeou
       messages: [{ role: 'user', content: userPrompt }],
     };
   } else {
-    headers['Authorization'] = `Bearer ${apiKey}`;
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     body = {
       model,
       messages: [
@@ -209,6 +235,33 @@ export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeou
     clearTimeout(timeoutId);
     throw err;
   }
+};
+
+/**
+ * Test connectivity and authentication for a user-configured model
+ */
+export const testModelConnection = async (config) => {
+  if (!config || !config.model || !config.model.trim()) {
+    throw new Error('Model identifier is required.');
+  }
+
+  const testConfig = { ...config, enabled: true };
+  const startTime = Date.now();
+  const testResponse = await callLLM(
+    'You are a model verification probe. Respond with only the word OK.',
+    'Ping.',
+    20,
+    10000,
+    testConfig
+  );
+  const latencyMs = Date.now() - startTime;
+  return {
+    ok: true,
+    model: config.model,
+    provider: config.provider || 'openai',
+    latencyMs,
+    sampleResponse: (testResponse || 'OK').trim().slice(0, 80),
+  };
 };
 
 /**
@@ -1385,7 +1438,7 @@ At its base, this domain balances functional correctness with execution efficien
 /**
  * Step 1: Refine raw student question into a structured learning prompt
  */
-export const refinePrompt = async (rawQuestion) => {
+export const refinePrompt = async (rawQuestion, customConfig = null) => {
   if (isGreetingOrCasual(rawQuestion)) {
     return 'User greeting & platform capabilities inquiry';
   }
@@ -1396,7 +1449,7 @@ Add academic depth, grade-level hints (Undergraduate B.Tech level), specific asp
 Respond ONLY with the rewritten prompt text. Do not add conversational preamble or quotes.`;
 
   try {
-    const text = await callLLM(systemPrompt, rawQuestion, 800, 12000);
+    const text = await callLLM(systemPrompt, rawQuestion, 800, 12000, customConfig);
     if (text && text.trim().length > 10) {
       return text.trim().replace(/^["']|["']$/g, '');
     }
@@ -1411,7 +1464,7 @@ Respond ONLY with the rewritten prompt text. Do not add conversational preamble 
 /**
  * Step 2: Generate structured answer (JSON) with explanation, key points, chart, subject tag, AND intelligent slides
  */
-export const generateStructuredAnswer = async (refinedPrompt, rawQuestion = '') => {
+export const generateStructuredAnswer = async (refinedPrompt, rawQuestion = '', customConfig = null) => {
   // If it's a greeting or casual chat, return clean conversational response with NO slides or charts
   if (isGreetingOrCasual(rawQuestion) || isGreetingOrCasual(refinedPrompt)) {
     return getKnowledgeBaseAnswer('hi');
@@ -1478,7 +1531,7 @@ Do not surround output with markdown code ticks or any extra text. Output ONLY v
   const visualizationTrace = detectAndGenerateVisualizationTrace(rawQuestion || refinedPrompt);
 
   try {
-    const rawText = await callLLM(systemPrompt, refinedPrompt, 1800, 10000);
+    const rawText = await callLLM(systemPrompt, refinedPrompt, 1800, 10000, customConfig);
     if (rawText) {
       const parsed = parseLlmJson(rawText);
 
@@ -1513,7 +1566,7 @@ Do not surround output with markdown code ticks or any extra text. Output ONLY v
 /**
  * Step 3: Simplify explanation (ELI5 mode)
  */
-export const simplifyExplanation = async (explanation, rawQuestion) => {
+export const simplifyExplanation = async (explanation, rawQuestion, customConfig = null) => {
   const systemPrompt = `You are a warm, engaging elementary school teacher and intuitive storyteller.
 Explain the following concept like the user is 5 years old (ELI5).
 Use simple everyday analogies (like toys, cooking, playgrounds, or games).
@@ -1524,7 +1577,9 @@ Return a friendly, clear, intuitive 2-3 paragraph explanation.`;
     const text = await callLLM(
       systemPrompt,
       `Original question: ${rawQuestion}\n\nExplanation:\n${explanation}`,
-      800
+      800,
+      12000,
+      customConfig
     );
     if (text && text.trim().length > 20) {
       return text.trim();
@@ -1548,7 +1603,7 @@ Return a friendly, clear, intuitive 2-3 paragraph explanation.`;
 /**
  * Step 4: Multi-turn Follow-up Answer Generator (ChatGPT style)
  */
-export const generateFollowUpAnswer = async (followUpQuestion, history = [], rawOriginalQuestion = '') => {
+export const generateFollowUpAnswer = async (followUpQuestion, history = [], rawOriginalQuestion = '', customConfig = null) => {
   const systemPrompt = `You are Clario, an elite AI technical tutor for B.Tech CSE university students.
 You are in an interactive ChatGPT-style technical dialogue with a student.
 Original conversation topic: "${rawOriginalQuestion}".
@@ -1571,7 +1626,7 @@ Respond strictly in valid JSON:
 Do not wrap JSON with extra text.`;
 
   try {
-    const rawText = await callLLM(systemPrompt, followUpQuestion, 2000);
+    const rawText = await callLLM(systemPrompt, followUpQuestion, 2000, 12000, customConfig);
     if (rawText) {
       const parsed = parseLlmJson(rawText);
       if (parsed && parsed.content) {

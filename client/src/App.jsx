@@ -1,6 +1,8 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ModelProvider, useModel } from './context/ModelContext';
+import { ModelConfigModal } from './components/ModelConfigModal';
 import { Navbar } from './components/Navbar';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -25,10 +27,14 @@ const RouteLoadingFallback = () => (
 function AppLayout() {
   const location = useLocation();
   const isShorts = location.pathname.startsWith('/shorts');
+  const { isModalOpen, setIsModalOpen } = useModel();
 
   return (
     <div className={`min-h-screen bg-[#080c14] flex flex-col font-sans text-slate-200 ${isShorts ? '' : 'engineering-grid'}`}>
       {!isShorts && <Navbar />}
+
+      {/* Model Configuration Modal */}
+      <ModelConfigModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
 
       <main className={isShorts ? 'flex-1 w-full h-[100dvh] overflow-hidden' : 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8'}>
         <Suspense fallback={<RouteLoadingFallback />}>
@@ -88,7 +94,9 @@ export function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
-        <AppLayout />
+        <ModelProvider>
+          <AppLayout />
+        </ModelProvider>
       </AuthProvider>
     </BrowserRouter>
   );

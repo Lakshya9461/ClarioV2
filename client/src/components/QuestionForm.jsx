@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Send, Terminal, Loader2, ArrowUpRight, Sparkles } from 'lucide-react';
+import { Send, Terminal, Loader2, ArrowUpRight, Sparkles, Cpu } from 'lucide-react';
+import { useModel } from '../context/ModelContext';
 
 const SUGGESTIONS = [
   { label: 'quicksort vs mergesort', query: 'compare quicksort and mergesort time complexity & stability' },
@@ -13,6 +14,7 @@ const SUGGESTIONS = [
 export const QuestionForm = ({ onSubmit, isLoading, status }) => {
   const [question, setQuestion] = useState('');
   const [focused, setFocused] = useState(false);
+  const { modelConfig, isCustomActive, setIsModalOpen } = useModel();
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -40,6 +42,19 @@ export const QuestionForm = ({ onSubmit, isLoading, status }) => {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className={`inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded border transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+              isCustomActive
+                ? 'bg-blue-500/15 text-blue-300 border-blue-500/30 hover:bg-blue-500/25'
+                : 'bg-slate-800/80 text-slate-400 border-slate-700/60 hover:text-slate-200 hover:border-slate-600'
+            }`}
+            title="Configure or switch LLM model engine"
+          >
+            <Cpu className="w-3 h-3 text-blue-400" />
+            <span>{isCustomActive ? `${modelConfig.provider}:${modelConfig.model}` : 'model: default'}</span>
+          </button>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/60 hidden sm:inline-block">
             visual traces, memory hierarchy, complexity
           </span>

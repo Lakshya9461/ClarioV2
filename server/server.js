@@ -22,6 +22,7 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import shortsRoutes from './routes/shortsRoutes.js';
 import learningGraphRoutes from './routes/learningGraphRoutes.js';
 import learningHarnessRoutes from './routes/learningHarnessRoutes.js';
+import modelRoutes from './routes/modelRoutes.js';
 
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
@@ -108,6 +109,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/shorts', shortsRoutes);
 app.use('/api/learning-graph', learningGraphRoutes);
 app.use('/api/harness', learningHarnessRoutes);
+app.use('/api/models', modelRoutes);
 
 // Static reports route (serves answer-me-with-html reports over HTTP to avoid file:/// browser blocks)
 const reportsDir = path.join(os.homedir(), '.answer-me-with-html', 'pages');

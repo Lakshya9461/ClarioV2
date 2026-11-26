@@ -31,6 +31,32 @@ const userSchema = new mongoose.Schema(
       default: 'student',
       required: true,
     },
+    customModel: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      provider: {
+        type: String,
+        enum: ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'ollama', 'custom'],
+        default: 'openai',
+      },
+      apiUrl: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      apiKey: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      model: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+    },
   },
   {
     timestamps: true,

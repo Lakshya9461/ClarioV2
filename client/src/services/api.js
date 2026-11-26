@@ -71,13 +71,29 @@ export const questionApi = {
       method: 'DELETE',
     }),
 
-  simplifyQuestion: (questionId) =>
+  simplifyQuestion: (questionId, modelConfig) =>
     request('/questions/simplify', {
       method: 'POST',
-      body: JSON.stringify({ questionId }),
+      body: JSON.stringify({ questionId, modelConfig }),
     }),
 
   getTags: () => request('/questions/tags'),
+};
+
+// Model Configuration Services
+export const modelApi = {
+  getPresets: () => request('/models/presets'),
+  getConfig: () => request('/models/config'),
+  updateConfig: (config) =>
+    request('/models/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
+  testConnection: (config) =>
+    request('/models/test', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
 };
 
 // Study List Services
