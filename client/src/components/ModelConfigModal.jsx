@@ -54,15 +54,23 @@ export const ModelConfigModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen, modelConfig]);
 
-  // Handle escape key
+  // Handle escape key and body scroll locking
   useEffect(() => {
+    if (!isOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -158,6 +166,9 @@ export const ModelConfigModal = ({ isOpen, onClose }) => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="model-config-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
     >
       <div className="w-full max-w-xl panel-elevated rounded-xl border border-slate-800 bg-[#0a0f1a] text-slate-200 shadow-2xl overflow-hidden font-sans">
@@ -407,7 +418,7 @@ export const ModelConfigModal = ({ isOpen, onClose }) => {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
                 >
                   Reset to Default
                 </button>
@@ -418,7 +429,7 @@ export const ModelConfigModal = ({ isOpen, onClose }) => {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3.5 py-1.5 text-xs font-mono font-medium text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                className="px-3.5 py-1.5 text-xs font-mono font-medium text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               >
                 Cancel
               </button>

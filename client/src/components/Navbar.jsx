@@ -39,6 +39,17 @@ export const Navbar = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Handle escape key to close mobile menu
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
