@@ -1,10 +1,13 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
+const DEFAULT_JWT_SECRET = 'clario-secure-jwt-secret-cse-btech-2025-x99';
+
 const generateToken = (id, role) => {
+  const secret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
   return jwt.sign(
     { id, role },
-    process.env.JWT_SECRET,
+    secret,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 };

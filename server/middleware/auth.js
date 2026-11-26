@@ -21,7 +21,7 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    const secret = process.env.JWT_SECRET;
+    const secret = process.env.JWT_SECRET || 'clario-secure-jwt-secret-cse-btech-2025-x99';
     const decoded = jwt.verify(token, secret);
 
     let user = await User.findById(decoded.id).select('-passwordHash');

@@ -33,6 +33,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await authApi.login({ email, password });
       if (res.success && res.user) {
+        if (res.token) {
+          try { localStorage.setItem('clario_auth_token', res.token); } catch (_) {}
+        }
         setUser(res.user);
         return res.user;
       }
@@ -47,6 +50,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await authApi.register(userData);
       if (res.success && res.user) {
+        if (res.token) {
+          try { localStorage.setItem('clario_auth_token', res.token); } catch (_) {}
+        }
         setUser(res.user);
         return res.user;
       }
@@ -60,8 +66,9 @@ export const AuthProvider = ({ children }) => {
     try {
       await authApi.logout();
     } catch (err) {
-      console.warn('Logout request failed:', err);
+      console.warn('Logout endpoint error (proceeding with local logout):', err);
     } finally {
+      try { localStorage.removeItem('clario_auth_token'); } catch (_) {}
       setUser(null);
     }
   };

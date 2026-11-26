@@ -13,11 +13,13 @@ export const useStreamAnswer = () => {
     dispatch({ type: 'START_ASKING', payload: { rawQuestion } });
 
     try {
+      const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('clario_auth_token') : null;
       const response = await fetch('/api/questions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({
           question: rawQuestion,
@@ -130,11 +132,13 @@ export const useStreamAnswer = () => {
     dispatch({ type: 'START_FOLLOW_UP', payload: { question: followUpText.trim() } });
 
     try {
+      const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('clario_auth_token') : null;
       const response = await fetch(`/api/questions/${state.questionId}/follow-up`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({
           question: followUpText.trim(),

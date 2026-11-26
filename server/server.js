@@ -26,8 +26,21 @@ import modelRoutes from './routes/modelRoutes.js';
 
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
-// Load environment variables
+// Load environment variables with fallback paths
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
+
+// Default fallback secret ensures authentication never crashes if JWT_SECRET is unset
+const DEFAULT_JWT_SECRET = 'clario-secure-jwt-secret-cse-btech-2025-x99';
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = DEFAULT_JWT_SECRET;
+  console.warn('⚠️ [Auth Warning] JWT_SECRET not found in environment. Using development fallback secret.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;

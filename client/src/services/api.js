@@ -1,8 +1,10 @@
 const BASE_URL = '/api';
 
 const request = async (endpoint, options = {}) => {
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('clario_auth_token') : null;
   const defaultHeaders = {
     'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
