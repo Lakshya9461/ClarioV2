@@ -106,43 +106,138 @@ export const sanitizeSearchKeywords = (keywords, fallbackTopic = '') => {
 };
 
 /**
- * Safely parse JSON from LLMs, handling raw control characters and unescaped newlines
+ * Repair truncated JSON by closing open strings, trimming dangling tokens, and closing open brackets/braces.
  */
-const parseLlmJson = (raw) => {
-  let cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1) {
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+const repairTruncatedJson = (text) => {
+  const stack = [];
+  let inString = false;
+  let escaped = false;
+  let lastValidEnd = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (c === '\\') {
+        escaped = true;
+      } else if (c === '"') {
+        inString = false;
+        lastValidEnd = i + 1;
+      }
+      continue;
+    }
+
+    if (c === '"') {
+      inString = true;
+    } else if (c === '{' || c === '[') {
+      stack.push(c);
+    } else if (c === '}' || c === ']') {
+      stack.pop();
+      lastValidEnd = i + 1;
+    } else if (c === ',' || /[\dtruefalsnul]/.test(c)) {
+      if (c !== ',') lastValidEnd = i + 1;
+    }
   }
 
+  let repaired = inString ? text + '"' : text;
+  // Remove trailing comma or incomplete key/colon before closing
+  repaired = repaired
+    .replace(/,\s*"[^"]*"\s*:\s*$/, '')
+    .replace(/,\s*"[^"]*"\s*$/, '')
+    .replace(/,\s*$/, '')
+    .replace(/:\s*$/, ': null');
+
+  // Recompute stack on repaired text to close remaining open containers
+  const closeStack = [];
+  inString = false;
+  escaped = false;
+  for (let i = 0; i < repaired.length; i++) {
+    const c = repaired[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === '{') closeStack.push('}');
+    else if (c === '[') closeStack.push(']');
+    else if (c === '}' || c === ']') closeStack.pop();
+  }
+
+  while (closeStack.length > 0) {
+    repaired += closeStack.pop();
+  }
+  return repaired;
+};
+
+/**
+ * Safely parse JSON from LLMs, handling raw control characters, unescaped LaTeX backslashes, and truncation
+ */
+export const parseLlmJson = (raw) => {
+  let cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+  const firstBrace = cleaned.indexOf('{');
+  if (firstBrace !== -1) {
+    cleaned = cleaned.substring(firstBrace);
+  }
+  const lastBrace = cleaned.lastIndexOf('}');
+  const balancedCandidate = lastBrace !== -1 ? cleaned.substring(0, lastBrace + 1) : cleaned;
+
   try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    let inString = false;
-    let escaped = false;
-    let fixed = '';
-    for (let i = 0; i < cleaned.length; i++) {
-      const c = cleaned[i];
-      if (c === '"' && !escaped) {
-        inString = !inString;
-      }
-      if (inString) {
-        if (c === '\n') {
-          fixed += '\\n';
-        } else if (c === '\r') {
-          // ignore
-        } else if (c === '\t') {
-          fixed += '\\t';
+    return JSON.parse(balancedCandidate);
+  } catch (_) {
+    const sanitizeStrings = (input) => {
+      let inString = false;
+      let escaped = false;
+      let fixed = '';
+      for (let i = 0; i < input.length; i++) {
+        const c = input[i];
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+            fixed += c;
+            continue;
+          }
+          if (c === '\\') {
+            const next = input[i + 1] || '';
+            // Valid JSON escapes: " \ / b f n r t u
+            if ('"\\/bfnrtu'.includes(next)) {
+              escaped = true;
+              fixed += c;
+            } else {
+              // Escape stray backslashes (e.g., LaTeX \Delta, \quad, \implies)
+              fixed += '\\\\';
+            }
+            continue;
+          }
+          if (c === '"') {
+            inString = false;
+            fixed += c;
+          } else if (c === '\n') {
+            fixed += '\\n';
+          } else if (c === '\r') {
+            // ignore
+          } else if (c === '\t') {
+            fixed += '\\t';
+          } else {
+            fixed += c;
+          }
         } else {
+          if (c === '"') inString = true;
           fixed += c;
         }
-      } else {
-        fixed += c;
       }
-      escaped = c === '\\' && !escaped;
+      return fixed;
+    };
+
+    try {
+      return JSON.parse(sanitizeStrings(balancedCandidate));
+    } catch (e2) {
+      // Final attempt: repair truncated JSON (e.g. cut off mid-slide due to max_tokens)
+      const sanitizedFull = sanitizeStrings(cleaned);
+      return JSON.parse(repairTruncatedJson(sanitizedFull));
     }
-    return JSON.parse(fixed);
   }
 };
 
@@ -2098,7 +2193,7 @@ Do not surround output with markdown code ticks or any extra text. Output ONLY v
   let llmError = null;
 
   try {
-    const rawText = await callLLM(systemPrompt, refinedPrompt, 2200, 45000, customConfig);
+    const rawText = await callLLM(systemPrompt, refinedPrompt, 4096, 45000, customConfig);
     if (rawText && rawText.trim()) {
       let parsed = null;
       try {
@@ -2260,7 +2355,7 @@ Respond strictly in valid JSON:
 Do not wrap JSON with extra text.`;
 
   try {
-    const rawText = await callLLM(systemPrompt, followUpQuestion, 2000, 40000, customConfig);
+    const rawText = await callLLM(systemPrompt, followUpQuestion, 3500, 40000, customConfig);
     if (rawText && rawText.trim()) {
       let parsed = null;
       try {

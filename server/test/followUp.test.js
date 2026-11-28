@@ -79,4 +79,22 @@ describe('Follow-Up & Knowledge Base Fallback', () => {
     assert.ok(!answer.explanation.includes('Connect a custom LLM model'));
     assert.strictEqual(answer.isFallbackStub, true);
   });
+
+  it('should repair truncated JSON with unescaped LaTeX backslashes in parseLlmJson', async () => {
+    const { parseLlmJson } = await import('../services/llmService.js');
+    const truncatedWithLatex = `{
+      "explanation": "Voltage Drop ($\\Delta V$) is $V = IR$.",
+      "keyPoints": ["Point 1", "Point 2"],
+      "chartData": { "type": "bar", "title": "AWG", "labels": ["18 AWG"], "values": [16], "datasetLabel": "Amps" },
+      "slides": [
+        { "slideNumber": 1, "title": "Slide 1", "codeOrFormula": "R = \\rho \\frac{L}{A} \\quad \\implies \\quad \\Delta V" },
+        { "slideNumber": 2, "title": "Truncated Slide`;
+
+    const parsed = parseLlmJson(truncatedWithLatex);
+    assert.ok(parsed.explanation.includes('Voltage Drop'));
+    assert.strictEqual(parsed.keyPoints.length, 2);
+    assert.ok(Array.isArray(parsed.slides));
+    assert.ok(parsed.slides.length >= 1);
+    assert.strictEqual(parsed.slides[0].title, 'Slide 1');
+  });
 });
