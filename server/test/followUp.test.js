@@ -61,4 +61,22 @@ describe('Follow-Up & Knowledge Base Fallback', () => {
     assert.ok(Array.isArray(answer.keyPoints));
     assert.ok(answer.keyPoints.length >= 2);
   });
+
+  it('should surface custom model error instead of "Connect a custom LLM model" when custom model is enabled and fails', async () => {
+    const query = 'what is a harness';
+    const { generateStructuredAnswer } = await import('../services/llmService.js');
+    const customConfig = {
+      enabled: true,
+      provider: 'custom',
+      apiUrl: 'http://127.0.0.1:59999/v1',
+      apiKey: 'test-key',
+      model: 'test-model',
+    };
+
+    const answer = await generateStructuredAnswer(query, query, customConfig);
+    assert.ok(answer.explanation.includes('Custom Model Request Failed'));
+    assert.ok(answer.explanation.includes('test-model'));
+    assert.ok(!answer.explanation.includes('Connect a custom LLM model'));
+    assert.strictEqual(answer.isFallbackStub, true);
+  });
 });

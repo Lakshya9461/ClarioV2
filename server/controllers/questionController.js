@@ -61,8 +61,12 @@ export const askQuestion = async (req, res, next) => {
   });
 
   try {
-    // 1. Check Redis Answer Cache
-    const cached = await getCachedAnswer(rawQuestion);
+    // 1. Check Redis Answer Cache (bypass when custom model is enabled, and never serve fallback stubs)
+    const useCustomModel = Boolean(customModelConfig?.enabled && customModelConfig?.model);
+    const cachedRaw = useCustomModel ? null : await getCachedAnswer(rawQuestion);
+    const cached = cachedRaw && !cachedRaw.isFallbackStub && !cachedRaw.explanation?.includes('Connect a custom LLM model')
+      ? cachedRaw
+      : null;
     if (cached) {
       res.write(`event: status\ndata: ${JSON.stringify({ stage: 'cache_hit', message: 'Instant response retrieved from Redis cache.' })}\n\n`);
 
@@ -150,19 +154,21 @@ export const askQuestion = async (req, res, next) => {
       visualizationTrace: structuredAnswer.visualizationTrace || null,
     });
 
-    // 6. Cache in Redis for instant repeat retrieval (7 days TTL)
-    await setCachedAnswer(rawQuestion, {
-      _id: newQuestion._id,
-      rawQuestion,
-      refinedPrompt: refined,
-      explanation: structuredAnswer.explanation,
-      keyPoints: structuredAnswer.keyPoints,
-      slides: structuredAnswer.slides || [],
-      chartData: structuredAnswer.chartData,
-      subjectTag: structuredAnswer.subjectTag,
-      searchKeywords: structuredAnswer.searchKeywords || [],
-      visualizationTrace: structuredAnswer.visualizationTrace || null,
-    });
+    // 6. Cache in Redis for instant repeat retrieval (7 days TTL) — never cache fallback stubs
+    if (!structuredAnswer.isFallbackStub && !structuredAnswer.explanation?.includes('Connect a custom LLM model')) {
+      await setCachedAnswer(rawQuestion, {
+        _id: newQuestion._id,
+        rawQuestion,
+        refinedPrompt: refined,
+        explanation: structuredAnswer.explanation,
+        keyPoints: structuredAnswer.keyPoints,
+        slides: structuredAnswer.slides || [],
+        chartData: structuredAnswer.chartData,
+        subjectTag: structuredAnswer.subjectTag,
+        searchKeywords: structuredAnswer.searchKeywords || [],
+        visualizationTrace: structuredAnswer.visualizationTrace || null,
+      });
+    }
 
     // 7. Emit final payload with complete chartData, keyPoints, and MongoDB document ID
     res.write(

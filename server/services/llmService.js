@@ -211,7 +211,9 @@ export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeou
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
       // Gemini's OpenAI endpoint supports both Authorization: Bearer and x-goog-api-key
-      headers['x-goog-api-key'] = apiKey;
+      if (apiUrl.includes('googleapis.com')) {
+        headers['x-goog-api-key'] = apiKey;
+      }
     }
     body = {
       model,
@@ -1995,6 +1997,7 @@ This is a **${tag.replace('_', ' ')}** topic. Connect a custom LLM model in the 
     subjectTag: tag,
     searchKeywords: [cleanTopic, `${cleanTopic} explained`, `${cleanTopic} tutorial`],
     slides: [],
+    isFallbackStub: true,
   };
 };
 
@@ -2092,6 +2095,7 @@ You MUST respond strictly with valid raw JSON matching this exact schema:
 Do not surround output with markdown code ticks or any extra text. Output ONLY valid JSON.`;
 
   const visualizationTrace = detectAndGenerateVisualizationTrace(rawQuestion || refinedPrompt);
+  let llmError = null;
 
   try {
     const rawText = await callLLM(systemPrompt, refinedPrompt, 2200, 45000, customConfig);
@@ -2147,10 +2151,40 @@ Do not surround output with markdown code ticks or any extra text. Output ONLY v
       }
     }
   } catch (err) {
+    llmError = err;
     console.warn(`[LLM Generate Notice] External API call error (${err.message}). Using fallback generator.`);
   }
 
   const kb = getKnowledgeBaseAnswer(rawQuestion || refinedPrompt);
+
+  // If the user HAS a custom model configured and it failed, report the actual model error
+  // instead of misleadingly telling them to "Connect a custom LLM model".
+  if (kb.isFallbackStub && customConfig?.enabled && customConfig?.model) {
+    const providerLabel = customConfig.provider || 'custom';
+    const errDetail = llmError?.message || 'The model returned an empty response.';
+    return {
+      explanation: `### Custom Model Request Failed (${providerLabel} / \`${customConfig.model}\`)
+
+Your configured model was reached, but the request failed before an answer could be generated:
+
+> \`${errDetail}\`
+
+**How to fix this:**
+1. Open **Model** settings in the top navigation bar and click **Test Connection** to verify your API key, base URL, and model ID.
+2. Check that your account has quota/credits and that the model name (\`${customConfig.model}\`) is valid for **${providerLabel}**.`,
+      keyPoints: [
+        `Configured model ${customConfig.model} (${providerLabel}) failed: ${errDetail}`,
+        'Use Test Connection in the Model modal to verify credentials and model ID.',
+      ],
+      chartData: null,
+      subjectTag: kb.subjectTag,
+      searchKeywords: sanitizeSearchKeywords(kb.searchKeywords, rawQuestion || refinedPrompt),
+      slides: [],
+      visualizationTrace,
+      isFallbackStub: true,
+    };
+  }
+
   return {
     explanation: kb.explanation,
     keyPoints: kb.keyPoints,
@@ -2159,6 +2193,7 @@ Do not surround output with markdown code ticks or any extra text. Output ONLY v
     searchKeywords: sanitizeSearchKeywords(kb.searchKeywords, rawQuestion || refinedPrompt),
     slides: sanitizeSlides(kb.slides, rawQuestion),
     visualizationTrace,
+    isFallbackStub: Boolean(kb.isFallbackStub),
   };
 };
 
