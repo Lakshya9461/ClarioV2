@@ -137,16 +137,18 @@ export const answerReducer = (state, action) => {
 
       // Check if new slides or chart arrived from the follow-up or updated question document
       const latestAssistant = updatedFollowUps.slice().reverse().find((m) => m.role === 'assistant');
-      const incomingSlides = (q.slides && q.slides.length > 0)
-        ? q.slides
+      const incomingSlides = (action.payload.slides && action.payload.slides.length > 0)
+        ? action.payload.slides
         : (latestAssistant?.slides && latestAssistant.slides.length > 0)
         ? latestAssistant.slides
+        : (q.slides && q.slides.length > 0)
+        ? q.slides
         : state.slides;
 
-      const incomingChart = q.chartData || latestAssistant?.chartData || state.chartData;
-      const incomingTrace = q.visualizationTrace || latestAssistant?.visualizationTrace || state.visualizationTrace;
+      const incomingChart = action.payload.chartData || latestAssistant?.chartData || q.chartData || state.chartData;
+      const incomingTrace = action.payload.visualizationTrace || latestAssistant?.visualizationTrace || q.visualizationTrace || state.visualizationTrace;
       const incomingRaw = q.rawQuestion || state.rawQuestion;
-      const incomingExplanation = q.explanation || state.explanation;
+      const incomingExplanation = q.explanation || latestAssistant?.content || state.explanation;
       const incomingKeyPoints = q.keyPoints || state.keyPoints;
 
       return {

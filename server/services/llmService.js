@@ -845,7 +845,307 @@ data = [1, 2, 3, 4, 5]  # Python automatically allocates PyListObject and frees 
     };
   }
 
-  // 3. Quicksort vs Mergesort / Sorting
+  // 3a. Selection Sort vs Insertion Sort
+  if (q.includes('selection') && q.includes('insertion')) {
+    return {
+      refinedPrompt:
+        'Provide a rigorous algorithmic comparison between Selection Sort and Insertion Sort for B.Tech CSE students. Analyze time complexity in best, average, and worst cases, comparison vs swap counts, memory write minimization, adaptive properties, and algorithmic stability.',
+      explanation: `### Algorithmic Comparison: Selection Sort vs Insertion Sort
+
+Both **Selection Sort** and **Insertion Sort** are elementary $O(N^2)$ comparison-based sorting algorithms, but they operate on fundamentally opposite selection and insertion mechanics.
+
+| Dimension | Selection Sort | Insertion Sort |
+| :--- | :--- | :--- |
+| **Best-Case Time** | **$O(N^2)$** (always scans remaining unsorted suffix) | **$O(N)$** (linear scan on already sorted input) |
+| **Average / Worst Time** | $O(N^2)$ comparisons | $O(N^2)$ comparisons & shifts |
+| **Total Memory Swaps** | **$O(N)$** swaps (at most 1 swap per outer pass) | $O(N^2)$ element shifts in worst-case |
+| **Algorithmic Stability** | **Unstable** (long-distance swaps displace equal keys) | **Stable** (inserts strictly before equal keys) |
+| **Adaptive Behavior** | Non-adaptive (runtime unaffected by pre-sorted order) | **Highly Adaptive** ($O(N + d)$ where $d$ is inversions count) |
+| **Online Processing** | No (requires entire dataset upfront) | **Yes (Online)** (can sort streaming inputs continuously) |
+| **Optimal Production Use** | EEPROM/Flash memory where write cycles are costly | Small arrays ($N \\le 16-32$), nearly sorted streams, Timsort run base |
+
+#### 1. Core Algorithmic Mechanics
+- **Selection Sort**: Divides the list into a sorted prefix and an unsorted suffix. In each pass, it linearly scans the unsorted suffix to find the absolute minimum key and swaps it once into its final destination.
+- **Insertion Sort**: Maintains a sorted prefix. For each new element, it shifts all larger sorted elements one position to the right and inserts the key into its correct relative position.`,
+      keyPoints: [
+        'Selection Sort minimizes memory writes: strictly O(N) swaps regardless of input permutation.',
+        'Insertion Sort is adaptive: achieves O(N) time on nearly sorted datasets with zero swaps.',
+        'Insertion Sort is stable; standard Selection Sort is unstable due to long-range swaps.',
+        'Modern hybrid sorting engines (Timsort in Python/Java, Introsort in C++) use Insertion Sort as their small-array base case.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Memory Write Operations Count (N = 1,000 Elements)',
+        labels: ['Selection Sort (Any Array)', 'Insertion Sort (Worst Case)', 'Bubble Sort (Worst Case)', 'Quicksort (Average)'],
+        values: [1000, 499500, 499500, 7000],
+        datasetLabel: 'Array Write / Swap Cycles',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['selection sort vs insertion sort', 'insertion sort adaptive complexity', 'selection sort memory writes', 'sorting algorithm comparison'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Selection Sort vs Insertion Sort: Trade-Off Analysis',
+          subtitle: 'Minimizing Memory Writes vs Exploiting Pre-Sorted Data',
+          layout: 'hero',
+          badge: 'Algorithmic Comparison',
+          keyConcept: 'Selection Sort performs O(N) writes with O(N²) comparisons; Insertion Sort performs O(N) time on nearly-sorted data.',
+          bulletPoints: [
+            { heading: 'Selection Sort Philosophy', description: 'Scan unsorted subarray for the minimum element, swap once per pass. Guaranteed O(N) writes.', tag: 'Fewest Writes' },
+            { heading: 'Insertion Sort Philosophy', description: 'Pick next item and shift larger elements right. Adapts to input order with O(N) best case.', tag: 'Adaptive' },
+            { heading: 'Stability Distinction', description: 'Insertion Sort preserves relative order of identical elements; Selection Sort swaps break stability.', tag: 'Stability' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Flash / EEPROM Invariant',
+            description: 'When writing to hardware where flash write cycles wear out memory cells (EEPROMs), Selection Sort is preferred over Insertion Sort because it guarantees at most N swaps.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'Execution Invariants & Step Traces',
+          subtitle: 'How each algorithm partitions the working array during execution',
+          layout: 'process',
+          badge: 'Execution Invariants',
+          keyConcept: 'Selection Sort establishes final positions from left to right; Insertion Sort establishes relative order within sorted prefix.',
+          bulletPoints: [
+            { heading: 'Selection Invariant', description: 'A[0..i-1] contains the smallest i elements of the entire array, already in their final resting positions.', tag: 'Global Min' },
+            { heading: 'Insertion Invariant', description: 'A[0..i-1] is sorted among itself, but elements may shift further right as future keys are inserted.', tag: 'Local Relative' },
+          ],
+          processSteps: [
+            'Selection Sort: for i=0 to n-2 ➔ minIdx = i ➔ scan j=i+1..n-1 ➔ swap(A[i], A[minIdx])',
+            'Insertion Sort: for i=1 to n-1 ➔ key = A[i] ➔ shift elements > key right ➔ A[j+1] = key',
+          ],
+          codeOrFormula: '// Selection Sort: exactly N-1 swaps\nfor (int i = 0; i < n-1; i++) {\n  int minIdx = i;\n  for (int j = i+1; j < n; j++)\n    if (arr[j] < arr[minIdx]) minIdx = j;\n  swap(&arr[i], &arr[minIdx]);\n}',
+          callout: {
+            title: 'Viva Examination Tip',
+            description: 'Viva question: "Is Insertion Sort an online algorithm?" Answer: Yes, because it can process and sort incoming items in a continuous stream without knowing future inputs.',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 3b. Bubble Sort
+  if (q.includes('bubble')) {
+    return {
+      refinedPrompt:
+        'Provide a rigorous technical breakdown of the Bubble Sort algorithm for B.Tech CSE students. Cover adjacent comparison mechanics, early termination optimization via swapped flags, best/worst-case Big-O bounds, space complexity, stability proof, and why it is primarily educational rather than production-grade.',
+      explanation: `### Algorithmic Breakdown: Bubble Sort
+
+**Bubble Sort** is an elementary comparison-based sorting algorithm that repeatedly steps through a list, compares adjacent elements, and swaps them if they are in the wrong order. With each outer pass, the largest unsorted element "bubbles up" to its correct position at the end of the array.
+
+| Dimension | Optimized Bubble Sort | Standard Bubble Sort |
+| :--- | :--- | :--- |
+| **Best-Case Time Complexity** | **$O(N)$** (with early termination check) | $O(N^2)$ (unconditionally checks all pairs) |
+| **Average-Case Time Complexity** | **$O(N^2)$** | $O(N^2)$ |
+| **Worst-Case Time Complexity** | **$O(N^2)$** (reverse sorted array) | $O(N^2)$ |
+| **Auxiliary Space Complexity** | **$O(1)$** (In-place sort) | $O(1)$ |
+| **Algorithmic Stability** | **Stable** (strictly swaps when $A[j] > A[j+1]$) | Stable |
+| **Total Comparison Count** | $\\sum_{k=1}^{N-1} k = \\frac{N(N-1)}{2}$ worst case | $\\frac{N(N-1)}{2}$ |
+| **Total Swap Count** | 0 (best) to $\\frac{N(N-1)}{2}$ (worst) | $\\frac{N(N-1)}{2}$ worst case |
+
+---
+
+#### 1. Core Algorithmic Mechanics
+1. **Adjacent Comparisons**: In pass $i$, pointers scan indices $j$ from $0$ up to $N - i - 2$.
+2. **Local Invariant Restoration**: If $arr[j] > arr[j+1]$, elements are swapped. Equal elements ($arr[j] == arr[j+1]$) are never swapped, guaranteeing **algorithmic stability**.
+3. **Suffix Settling**: After pass $i$, the largest remaining element is locked into index $N - 1 - i$.
+4. **Early Exit Optimization**: If a full pass completes with zero swaps executed, the array is already sorted, enabling early termination in $O(N)$ time.`,
+      keyPoints: [
+        'Bubble Sort is an in-place, stable comparison sort with O(1) auxiliary memory.',
+        'With an early-termination flag (swapped = false), best-case time complexity drops to O(N).',
+        'Worst-case time complexity is O(N²) when the input array is sorted in reverse order.',
+        'Bubble Sort is rarely used in production due to high constant factors and excessive cache-unfriendly memory writes.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Bubble Sort Comparisons: Optimized vs Unoptimized (N = 100)',
+        labels: ['Best Case (Optimized)', 'Best Case (Standard)', 'Average Case', 'Worst Case (Reversed)'],
+        values: [99, 4950, 4950, 4950],
+        datasetLabel: 'Number of Element Comparisons',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['bubble sort algorithm', 'bubble sort time complexity', 'bubble sort early termination', 'stable sorting algorithms'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Bubble Sort: Algorithmic Mechanics & Properties',
+          subtitle: 'Adjacent comparisons and iterative floating of maximum keys',
+          layout: 'hero',
+          badge: 'Sorting Fundamentals',
+          keyConcept: 'Repeatedly swaps adjacent out-of-order pairs until the largest elements settle at the upper end of the array.',
+          bulletPoints: [
+            { heading: 'Bubbling Action', description: 'Elements move towards their final destinations through contiguous pair exchanges.', tag: 'In-Place' },
+            { heading: 'Stability Guarantee', description: 'Because strictly greater-than check (>) is used, equal keys maintain original order.', tag: 'Stable' },
+            { heading: 'Early Termination', description: 'If an entire pass yields zero swaps, execution breaks early in linear O(N) time.', tag: 'Optimization' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Invariant Rule',
+            description: 'After the k-th pass of Bubble Sort, the last k elements of the array are guaranteed to be in their final sorted positions.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'Optimized Implementation & Trace',
+          subtitle: 'Step-by-step C implementation with swapped boolean flag',
+          layout: 'process',
+          badge: 'Code Implementation',
+          keyConcept: 'Preventing unnecessary passes via a boolean swap sentinel flag.',
+          bulletPoints: [
+            { heading: 'Inner Loop Bound', description: 'Limit to n - i - 1 to avoid redundant comparisons against already sorted suffix.', tag: 'Bound' },
+            { heading: 'Swap Sentinel', description: 'Set swapped = true inside the if block; break if false at the end of the outer loop.', tag: 'Sentinel' },
+          ],
+          processSteps: [
+            'Initialize swapped = false at start of each outer pass i',
+            'Iterate j from 0 to n - i - 2, comparing arr[j] and arr[j+1]',
+            'If arr[j] > arr[j+1], swap them and set swapped = true',
+            'If swapped is still false after inner loop, terminate immediately',
+          ],
+          codeOrFormula: 'void bubbleSort(int arr[], int n) {\n  for (int i = 0; i < n - 1; i++) {\n    bool swapped = false;\n    for (int j = 0; j < n - i - 1; j++) {\n      if (arr[j] > arr[j + 1]) {\n        swap(&arr[j], &arr[j + 1]);\n        swapped = true;\n      }\n    }\n    if (!swapped) break;\n  }\n}',
+          callout: {
+            title: 'Viva Question Alert',
+            description: 'Viva question: "What is the best case time complexity of unoptimized vs optimized Bubble Sort?" Answer: O(N²) for unoptimized, but O(N) for optimized using the swapped flag.',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 3c. Selection Sort Single
+  if (q.includes('selection')) {
+    return {
+      refinedPrompt:
+        'Provide a technical breakdown of Selection Sort for B.Tech CSE students. Cover scan mechanics, minimum index selection, swap count minimization, unstable sorting proofs, and Big-O complexity.',
+      explanation: `### Algorithmic Breakdown: Selection Sort
+
+**Selection Sort** is an in-place comparison sort that divides the input array into two parts: a sorted subarray built up from left to right at the front, and a remaining unsorted subarray occupying the rest of the array.
+
+| Dimension | Selection Sort Parameter |
+| :--- | :--- |
+| **Time Complexity (All Cases)** | **$O(N^2)$** (Best, Average, and Worst are all identical) |
+| **Comparisons Count** | $\\frac{N(N-1)}{2}$ comparisons in every case |
+| **Total Memory Swaps** | **At most $N - 1$ swaps** ($O(N)$ bound) |
+| **Auxiliary Memory Space** | **$O(1)$** auxiliary (strict in-place) |
+| **Algorithmic Stability** | **Unstable** (long-distance swaps disrupt equal key orders) |
+| **Key Advantage** | Minimizes write cycles into memory hardware |
+
+#### Algorithmic Invariant
+In iteration $i$ (from $0$ to $N - 2$):
+1. Scan $arr[i+1 \\dots N-1]$ to find the index $minIdx$ with minimum value.
+2. Swap $arr[i]$ with $arr[minIdx]$.
+3. Array slice $arr[0 \\dots i]$ is now sorted and will never be touched again.`,
+      keyPoints: [
+        'Selection Sort performs O(N²) comparisons across all inputs without exception.',
+        'Performs at most N - 1 swaps, making it ideal when memory write costs are high.',
+        'Selection Sort is unstable in standard array representations.',
+        'Does not adapt to pre-sorted inputs.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Comparison vs Swap Operations in Selection Sort (N = 50)',
+        labels: ['Comparisons (Best Case)', 'Comparisons (Worst Case)', 'Swaps (Worst Case)', 'Swaps (Best Case)'],
+        values: [1225, 1225, 49, 0],
+        datasetLabel: 'Operations Count',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['selection sort algorithm', 'selection sort time complexity', 'unstable sorting algorithms', 'minimum swap sorting'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Selection Sort: Minimum Selection Strategy',
+          subtitle: 'Linear scan for global minimum with exactly one swap per pass',
+          layout: 'hero',
+          badge: 'Algorithm Design',
+          keyConcept: 'Find the minimum element in unsorted subarray and place it at the beginning of the unsorted segment.',
+          bulletPoints: [
+            { heading: 'Minimal Memory Writes', description: 'Requires at most N - 1 swaps in total, drastically fewer writes than Bubble Sort.', tag: 'Fewest Writes' },
+            { heading: 'Fixed Comparison Cost', description: 'Always performs N(N-1)/2 comparisons regardless of whether input is sorted or reversed.', tag: 'O(N²)' },
+            { heading: 'Unstable Nature', description: 'Swapping an element over equal elements destroys initial sequence order.', tag: 'Unstable' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Why Unstable?',
+            description: 'Example: [4a, 4b, 2]. Minimum is 2. Swapping 4a with 2 yields [2, 4b, 4a]. Notice 4b now precedes 4a! Hence unstable.',
+            type: 'warning',
+          },
+        },
+      ],
+    };
+  }
+
+  // 3d. Insertion Sort Single
+  if (q.includes('insertion')) {
+    return {
+      refinedPrompt:
+        'Provide a technical breakdown of Insertion Sort for B.Tech CSE students. Cover key extraction, right-shifting of sorted prefix, adaptive linear time on nearly-sorted data, stability proof, and usage in hybrid sorting algorithms.',
+      explanation: `### Algorithmic Breakdown: Insertion Sort
+
+**Insertion Sort** is an adaptive, stable, in-place comparison sort that builds the final sorted array one item at a time. It is analogous to the way most people sort a hand of playing cards.
+
+| Dimension | Insertion Sort Parameter |
+| :--- | :--- |
+| **Best-Case Time Complexity** | **$O(N)$** (When array is already sorted or nearly sorted) |
+| **Average-Case Time Complexity** | **$O(N^2)$** ($\approx N^2 / 4$ comparisons and shifts) |
+| **Worst-Case Time Complexity** | **$O(N^2)$** ($\approx N^2 / 2$ comparisons and shifts for reverse array) |
+| **Auxiliary Memory Space** | **$O(1)$** auxiliary (In-place) |
+| **Algorithmic Stability** | **Stable** (items with equal keys are never shifted past each other) |
+| **Online Capability** | **Yes** (processes elements as they arrive from a stream) |
+
+#### Algorithmic Invariant
+In iteration $i$ (from $1$ to $N - 1$):
+1. Element $key = arr[i]$ is extracted into a temporary variable.
+2. Elements in $arr[0 \\dots i-1]$ that are greater than $key$ shift one position right.
+3. The $key$ is placed into the resulting vacant slot.`,
+      keyPoints: [
+        'Insertion Sort is adaptive: runs in O(N) linear time on sorted or nearly sorted datasets.',
+        'Maintains algorithmic stability by strictly shifting elements greater than the key.',
+        'Online algorithm: capable of sorting elements continuously as they arrive in a stream.',
+        'Core building block of hybrid algorithms like Timsort (Python, Java) and Introsort (C++ std::sort).',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Insertion Sort Time Comparison across Input Permutations (N = 1,000)',
+        labels: ['Already Sorted (Best)', '10% Disordered', 'Random Permutation', 'Reverse Sorted (Worst)'],
+        values: [1000, 55000, 250000, 499500],
+        datasetLabel: 'Comparison & Shift Operations',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['insertion sort algorithm', 'adaptive sorting algorithm', 'online sorting algorithms', 'timsort base case'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Insertion Sort: Incremental Placement Strategy',
+          subtitle: 'Shifting larger elements right to insert key into sorted prefix',
+          layout: 'hero',
+          badge: 'Adaptive Algorithm',
+          keyConcept: 'Iteratively extracts a key element and shifts larger sorted elements right to insert the key into place.',
+          bulletPoints: [
+            { heading: 'Adaptive Speed', description: 'Runs in O(N) on sorted lists with exactly 1 comparison and 0 shifts per element.', tag: 'O(N) Best' },
+            { heading: 'Strict Stability', description: 'Because elements equal to the key are never shifted, initial relative ordering is preserved.', tag: 'Stable' },
+            { heading: 'Streaming / Online', description: 'Can continuously sort elements received one by one over an input socket or stream.', tag: 'Online' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Production Relevance',
+            description: 'Why do we study O(N²) Insertion Sort? Because on small subarrays (N <= 32), its tiny constant factor and cache locality beat Quicksort and Mergesort. Modern engines (Python Timsort, C++ Introsort) switch to Insertion Sort for small partitions!',
+            type: 'insight',
+          },
+        },
+      ],
+    };
+  }
+
+  // 3e. Quicksort vs Mergesort / Sorting
   if (q.includes('quicksort') || q.includes('mergesort') || q.includes('sort')) {
     return {
       refinedPrompt:
@@ -2011,6 +2311,18 @@ Store small, fixed-size primitives on the **Stack**; store large or variable-len
   if (cmp) {
     const { entityA, entityB } = cmp;
     const kb = getKnowledgeBaseAnswer(followUpQuestion);
+
+    // If an authoritative knowledge base breakdown exists for this comparison, use it
+    if (kb && kb.explanation && !isGreetingOrCasual(followUpQuestion)) {
+      const isOrigCasual = isGreetingOrCasual(rawOriginalQuestion);
+      return {
+        content: `${!isOrigCasual ? `Following up on our discussion of **${rawOriginalQuestion}**:\n\n` : ''}${kb.explanation}`,
+        keyTakeaways: kb.keyPoints || [],
+        slides: (kb.slides && kb.slides.length > 0) ? kb.slides : [],
+        chartData: kb.chartData || null,
+      };
+    }
+
     return {
       content: `### Architectural Analysis: ${entityA} vs ${entityB}
 
@@ -2050,10 +2362,20 @@ When evaluating **${entityA}** versus **${entityB}**, the decision depends on yo
     };
   }
 
-  // General Technical Fallback (Never output "In the context of hi")
+  // General Technical Fallback
   const isOrigCasual = isGreetingOrCasual(rawOriginalQuestion);
   const cleanQ = extractCleanTopic(followUpQuestion);
   const kb = getKnowledgeBaseAnswer(followUpQuestion);
+
+  // If knowledge base has an authoritative technical breakdown for this follow-up, use its full rich content, slides & charts!
+  if (kb && kb.explanation && !isGreetingOrCasual(followUpQuestion)) {
+    return {
+      content: `${!isOrigCasual ? `Following up on our discussion of **${rawOriginalQuestion}**:\n\n` : ''}${kb.explanation}`,
+      keyTakeaways: kb.keyPoints || [],
+      slides: (kb.slides && kb.slides.length > 0) ? kb.slides : [],
+      chartData: kb.chartData || null,
+    };
+  }
 
   return {
     content: `### Analysis: ${cleanQ.replace(/\b\w/g, (l) => l.toUpperCase())}

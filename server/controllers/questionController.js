@@ -245,19 +245,22 @@ export const handleFollowUpStream = async (req, res, parentQuestionId, followUpT
     };
     parentQuestion.followUps.push(assistantEntry);
 
-    if (trace && !parentQuestion.visualizationTrace) {
+    // If follow-up mentions or triggers an algorithm, update the active visualization trace
+    if (trace) {
       parentQuestion.visualizationTrace = trace;
     }
 
-    // If the conversation started with a casual greeting (no slides),
-    // and this follow-up generated a real conceptual slide deck,
-    // promote the slides & chartData to the primary question attributes so the PPT is created immediately!
-    if ((!parentQuestion.slides || parentQuestion.slides.length === 0) && assistantEntry.slides?.length > 0) {
+    // If this follow-up generated a new slide deck, update parentQuestion slides so the presentation view reflects it
+    if (assistantEntry.slides?.length > 0) {
       parentQuestion.slides = assistantEntry.slides;
-      parentQuestion.chartData = assistantEntry.chartData;
+      if (assistantEntry.chartData) {
+        parentQuestion.chartData = assistantEntry.chartData;
+      }
       parentQuestion.rawQuestion = followUpText;
       parentQuestion.explanation = assistantEntry.content;
-      parentQuestion.keyPoints = followUpAnswer.keyTakeaways || [];
+      if (followUpAnswer.keyTakeaways?.length > 0) {
+        parentQuestion.keyPoints = followUpAnswer.keyTakeaways;
+      }
     }
 
     await parentQuestion.save();
@@ -269,6 +272,8 @@ export const handleFollowUpStream = async (req, res, parentQuestionId, followUpT
         isFollowUp: true,
         followUps: parentQuestion.followUps,
         latestResponse: assistantEntry,
+        visualizationTrace: trace || parentQuestion.visualizationTrace,
+        slides: assistantEntry.slides?.length > 0 ? assistantEntry.slides : parentQuestion.slides,
       })}\n\n`
     );
 
