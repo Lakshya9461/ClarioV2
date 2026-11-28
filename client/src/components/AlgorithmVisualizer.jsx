@@ -290,28 +290,41 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
           </div>
 
           {/* Comparative Metrics / Trade-offs */}
-          <div className="text-[11px] font-mono text-slate-400 hidden lg:flex items-center gap-3">
-            <span>
-              In-Place:{' '}
-              <strong className={selectedAlgorithmId === 'quicksort' ? 'text-emerald-400' : 'text-slate-300'}>
-                {selectedAlgorithmId === 'quicksort' ? 'Yes (O(1) aux)' : 'No (O(N) aux)'}
-              </strong>
-            </span>
-            <span className="text-slate-700">|</span>
-            <span>
-              Stable:{' '}
-              <strong className={selectedAlgorithmId === 'mergesort' ? 'text-emerald-400' : 'text-amber-400'}>
-                {selectedAlgorithmId === 'mergesort' ? 'Yes' : 'No'}
-              </strong>
-            </span>
-            <span className="text-slate-700">|</span>
-            <span>
-              Worst-Case:{' '}
-              <strong className={selectedAlgorithmId === 'mergesort' ? 'text-emerald-400' : 'text-rose-400'}>
-                {selectedAlgorithmId === 'mergesort' ? 'O(N log N)' : 'O(N²)'}
-              </strong>
-            </span>
-          </div>
+          {(() => {
+            const currentMeta = trace.comparison.algorithms.find((a) => a.id === selectedAlgorithmId);
+            return (
+              <div className="text-[11px] font-mono text-slate-400 hidden lg:flex items-center gap-3">
+                <span>
+                  Space:{' '}
+                  <strong className={currentMeta?.space === 'O(1)' || currentMeta?.space === 'O(log N)' ? 'text-emerald-400' : 'text-slate-300'}>
+                    {currentMeta?.space || 'O(1)'}
+                  </strong>
+                </span>
+                <span className="text-slate-700">|</span>
+                <span>
+                  Stable:{' '}
+                  <strong className={currentMeta?.stable ? 'text-emerald-400' : 'text-amber-400'}>
+                    {currentMeta?.stable ? 'Yes' : 'No'}
+                  </strong>
+                </span>
+                <span className="text-slate-700">|</span>
+                <span>
+                  Worst-Case:{' '}
+                  <strong className={currentMeta?.timeWorst === 'O(N log N)' ? 'text-emerald-400' : 'text-rose-400'}>
+                    {currentMeta?.timeWorst || 'O(N²)'}
+                  </strong>
+                </span>
+                {currentMeta?.paradigm && (
+                  <>
+                    <span className="text-slate-700">|</span>
+                    <span className="text-slate-400 max-w-[220px] truncate" title={currentMeta.paradigm}>
+                      {currentMeta.paradigm}
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -385,6 +398,12 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
                         )}
                         {state.pointers?.k === idx && (
                           <span className="px-1 py-0.2 text-[9px] font-mono font-bold bg-cyan-500 text-black rounded">k</span>
+                        )}
+                        {state.pointers?.minIdx === idx && (
+                          <span className="px-1 py-0.2 text-[9px] font-mono font-bold bg-amber-400 text-black rounded">min</span>
+                        )}
+                        {state.pointers?.key === idx && (
+                          <span className="px-1 py-0.2 text-[9px] font-mono font-bold bg-purple-500 text-white rounded">key</span>
                         )}
                       </div>
                     </div>

@@ -5,6 +5,8 @@ import {
   generateQuicksortTrace,
   generateMergeSortTrace,
   generateSortingComparisonTrace,
+  generateInsertionSortTrace,
+  generateSelectionSortTrace,
   generateBubbleSortTrace,
   generateBinarySearchTrace,
   generateRecursionTrace,
@@ -42,6 +44,36 @@ describe('Algorithm Visualizer Service', () => {
 
     const divideStep = trace.steps.find((s) => s.state?.action === 'DIVIDE');
     assert.ok(divideStep);
+    const lastStep = trace.steps[trace.steps.length - 1];
+    assert.strictEqual(lastStep.state.action, 'DONE');
+  });
+
+  it('should generate valid insertion sort trace', () => {
+    const trace = generateInsertionSortTrace([38, 27, 43, 3, 9, 82, 10]);
+    assert.strictEqual(trace.algorithm, 'insertionsort');
+    assert.strictEqual(trace.category, 'sorting');
+    assert.ok(Array.isArray(trace.steps));
+    assert.ok(trace.steps.length > 8);
+    assert.strictEqual(trace.complexity.timeBest, 'O(N)');
+    assert.strictEqual(trace.complexity.space, 'O(1)');
+
+    const insertStep = trace.steps.find((s) => s.state?.action === 'INSERT_DONE');
+    assert.ok(insertStep);
+    const lastStep = trace.steps[trace.steps.length - 1];
+    assert.strictEqual(lastStep.state.action, 'DONE');
+  });
+
+  it('should generate valid selection sort trace', () => {
+    const trace = generateSelectionSortTrace([38, 27, 43, 3, 9, 82, 10]);
+    assert.strictEqual(trace.algorithm, 'selectionsort');
+    assert.strictEqual(trace.category, 'sorting');
+    assert.ok(Array.isArray(trace.steps));
+    assert.ok(trace.steps.length > 8);
+    assert.strictEqual(trace.complexity.timeWorst, 'O(N²)');
+    assert.strictEqual(trace.complexity.space, 'O(1)');
+
+    const minStep = trace.steps.find((s) => s.state?.action === 'SET_MIN');
+    assert.ok(minStep);
     const lastStep = trace.steps[trace.steps.length - 1];
     assert.strictEqual(lastStep.state.action, 'DONE');
   });
@@ -131,6 +163,23 @@ describe('Algorithm Visualizer Service', () => {
     assert.ok(comparisonTrace.comparison);
     assert.strictEqual(comparisonTrace.comparison.isComparison, true);
     assert.strictEqual(comparisonTrace.comparison.algorithms.length, 2);
+
+    // Verify selection sort vs insertion sort comparison
+    const selectVsInsertTrace = detectAndGenerateVisualizationTrace('selection sort vs insertion sort');
+    assert.ok(selectVsInsertTrace);
+    assert.ok(selectVsInsertTrace.comparison);
+    assert.strictEqual(selectVsInsertTrace.comparison.isComparison, true);
+    assert.strictEqual(selectVsInsertTrace.comparison.algorithms[0].id, 'selectionsort');
+    assert.strictEqual(selectVsInsertTrace.comparison.algorithms[1].id, 'insertionsort');
+
+    // Verify single algorithm queries
+    const selectTrace = detectAndGenerateVisualizationTrace('How does selection sort work?');
+    assert.ok(selectTrace);
+    assert.strictEqual(selectTrace.algorithm, 'selectionsort');
+
+    const insertTrace = detectAndGenerateVisualizationTrace('Explain insertion sort invariant');
+    assert.ok(insertTrace);
+    assert.strictEqual(insertTrace.algorithm, 'insertionsort');
 
     const bsearchTrace = detectAndGenerateVisualizationTrace('Explain binary search on sorted array');
     assert.ok(bsearchTrace);

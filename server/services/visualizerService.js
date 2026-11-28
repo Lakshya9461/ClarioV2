@@ -564,7 +564,394 @@ export const generateBubbleSortTrace = (customArray) => {
 };
 
 /**
- * 3. Binary Search Trace Generator
+ * 4. Insertion Sort Trace Generator
+ */
+export const generateInsertionSortTrace = (customArray) => {
+  const arr = getCleanArray(customArray);
+  const a = [...arr];
+  const steps = [];
+  let stepCount = 1;
+
+  const pseudocode = [
+    'function insertionSort(arr):',
+    '  for i = 1 to length(arr) - 1:',
+    '    key = arr[i]',
+    '    j = i - 1',
+    '    while j >= 0 and arr[j] > key:',
+    '      arr[j + 1] = arr[j]',
+    '      j = j - 1',
+    '    arr[j + 1] = key',
+  ];
+
+  steps.push({
+    stepNumber: stepCount++,
+    description: `Initialize Insertion Sort on ${a.length} elements. First element arr[0]=${a[0]} is trivially sorted.`,
+    codeLine: 0,
+    state: {
+      array: a.map((val, idx) => ({ value: val, index: idx, status: idx === 0 ? 'sorted' : 'default' })),
+      pointers: { i: 1 },
+      action: 'INIT',
+      actionMessage: 'Ready for insertion pass 1.',
+    },
+    callStack: [{ fn: 'insertionSort', args: `n=${a.length}`, line: 1 }],
+  });
+
+  const n = a.length;
+  for (let i = 1; i < n; i++) {
+    const key = a[i];
+    let j = i - 1;
+
+    steps.push({
+      stepNumber: stepCount++,
+      description: `Picking arr[${i}] (${key}) as key to insert into sorted prefix [0..${i - 1}].`,
+      codeLine: 2,
+      state: {
+        array: a.map((val, idx) => ({
+          value: val,
+          index: idx,
+          status: idx === i ? 'pivot' : idx < i ? 'sorted' : 'default',
+        })),
+        pointers: { i, j, key: i },
+        action: 'SELECT_KEY',
+        actionMessage: `Key to insert = ${key}.`,
+      },
+      callStack: [{ fn: 'insertionSort', args: `inserting i=${i}, key=${key}`, line: 2 }],
+    });
+
+    while (j >= 0 && a[j] > key) {
+      steps.push({
+        stepNumber: stepCount++,
+        description: `arr[${j}] (${a[j]}) > key (${key}): Shifting ${a[j]} right to index ${j + 1}.`,
+        codeLine: 5,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx === j ? 'comparing' : idx === j + 1 ? 'swapping' : idx < i ? 'sorted' : 'default',
+          })),
+          pointers: { i, j, key: i },
+          action: 'SHIFT',
+          actionMessage: `Shift ${a[j]} to index ${j + 1}.`,
+        },
+        callStack: [{ fn: 'insertionSort', args: `shifting j=${j}`, line: 5 }],
+      });
+
+      a[j + 1] = a[j];
+      j--;
+    }
+
+    a[j + 1] = key;
+
+    steps.push({
+      stepNumber: stepCount++,
+      description: `Inserted key (${key}) at position ${j + 1}. Prefix [0..${i}] is now sorted.`,
+      codeLine: 7,
+      state: {
+        array: a.map((val, idx) => ({
+          value: val,
+          index: idx,
+          status: idx <= i ? 'sorted' : 'default',
+        })),
+        pointers: { i, insertPos: j + 1 },
+        action: 'INSERT_DONE',
+        actionMessage: `Placed ${key} at index ${j + 1}.`,
+      },
+      callStack: [{ fn: 'insertionSort', args: `inserted at ${j + 1}`, line: 7 }],
+    });
+  }
+
+  steps.push({
+    stepNumber: stepCount++,
+    description: 'Insertion Sort completed. Entire array is sorted in-place.',
+    codeLine: 7,
+    state: {
+      array: a.map((val, idx) => ({ value: val, index: idx, status: 'sorted' })),
+      pointers: {},
+      action: 'DONE',
+      actionMessage: 'All elements sorted in-place.',
+    },
+    callStack: [],
+  });
+
+  return {
+    algorithm: 'insertionsort',
+    title: 'Insertion Sort Algorithm Visualization',
+    category: 'sorting',
+    complexity: {
+      timeBest: 'O(N)',
+      timeAvg: 'O(N²)',
+      timeWorst: 'O(N²)',
+      space: 'O(1)',
+    },
+    pseudocode,
+    initialState: { array: arr },
+    steps,
+  };
+};
+
+/**
+ * 5. Selection Sort Trace Generator
+ */
+export const generateSelectionSortTrace = (customArray) => {
+  const arr = getCleanArray(customArray);
+  const a = [...arr];
+  const steps = [];
+  let stepCount = 1;
+
+  const pseudocode = [
+    'function selectionSort(arr):',
+    '  n = length(arr)',
+    '  for i = 0 to n - 2:',
+    '    minIdx = i',
+    '    for j = i + 1 to n - 1:',
+    '      if arr[j] < arr[minIdx]: minIdx = j',
+    '    if minIdx != i: swap(arr[i], arr[minIdx])',
+  ];
+
+  steps.push({
+    stepNumber: stepCount++,
+    description: `Initialize Selection Sort with ${a.length} elements.`,
+    codeLine: 0,
+    state: {
+      array: a.map((val, idx) => ({ value: val, index: idx, status: 'default' })),
+      pointers: { i: 0 },
+      action: 'INIT',
+      actionMessage: 'Starting pass 0 to find minimum.',
+    },
+    callStack: [{ fn: 'selectionSort', args: `n=${a.length}`, line: 1 }],
+  });
+
+  const n = a.length;
+  for (let i = 0; i < n - 1; i++) {
+    let minIdx = i;
+
+    steps.push({
+      stepNumber: stepCount++,
+      description: `Pass ${i + 1}: Find minimum element in unsorted range [${i}..${n - 1}]. Initial min is arr[${i}] (${a[i]}).`,
+      codeLine: 3,
+      state: {
+        array: a.map((val, idx) => ({
+          value: val,
+          index: idx,
+          status: idx < i ? 'sorted' : idx === minIdx ? 'pivot' : 'default',
+        })),
+        pointers: { i, minIdx },
+        action: 'SET_MIN',
+        actionMessage: `Current min = arr[${minIdx}] (${a[minIdx]}).`,
+      },
+      callStack: [{ fn: 'selectionSort', args: `pass i=${i}`, line: 3 }],
+    });
+
+    for (let j = i + 1; j < n; j++) {
+      const isNewMin = a[j] < a[minIdx];
+
+      steps.push({
+        stepNumber: stepCount++,
+        description: `Comparing arr[${j}] (${a[j]}) with current min arr[${minIdx}] (${a[minIdx]}). ${
+          isNewMin ? `New minimum found: ${a[j]}!` : `${a[j]} >= ${a[minIdx]}, keep current min.`
+        }`,
+        codeLine: 5,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx < i ? 'sorted' : idx === minIdx ? 'pivot' : idx === j ? 'comparing' : 'default',
+          })),
+          pointers: { i, j, minIdx },
+          action: 'COMPARE',
+          actionMessage: `${a[j]} ${isNewMin ? '<' : '>='} ${a[minIdx]}`,
+        },
+        callStack: [{ fn: 'selectionSort', args: `scanning j=${j}`, line: 5 }],
+      });
+
+      if (isNewMin) {
+        minIdx = j;
+      }
+    }
+
+    if (minIdx !== i) {
+      const temp = a[i];
+      a[i] = a[minIdx];
+      a[minIdx] = temp;
+
+      steps.push({
+        stepNumber: stepCount++,
+        description: `Swapping arr[${i}] (${temp}) with minimum element arr[${minIdx}] (${a[i]}).`,
+        codeLine: 6,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx <= i ? 'sorted' : idx === minIdx ? 'swapping' : 'default',
+          })),
+          pointers: { i, minIdx },
+          action: 'SWAP',
+          actionMessage: `Swapped index ${i} and ${minIdx}.`,
+        },
+        callStack: [{ fn: 'selectionSort', args: `swapped ${i} with ${minIdx}`, line: 6 }],
+      });
+    } else {
+      steps.push({
+        stepNumber: stepCount++,
+        description: `arr[${i}] (${a[i]}) is already the minimum for range [${i}..${n - 1}]. No swap needed.`,
+        codeLine: 6,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx <= i ? 'sorted' : 'default',
+          })),
+          pointers: { i },
+          action: 'NO_SWAP',
+          actionMessage: `Element ${a[i]} already in correct sorted position.`,
+        },
+        callStack: [{ fn: 'selectionSort', args: `i=${i} already in place`, line: 6 }],
+      });
+    }
+  }
+
+  steps.push({
+    stepNumber: stepCount++,
+    description: 'Selection Sort completed. All elements sorted in-place.',
+    codeLine: 6,
+    state: {
+      array: a.map((val, idx) => ({ value: val, index: idx, status: 'sorted' })),
+      pointers: {},
+      action: 'DONE',
+      actionMessage: 'All elements sorted in-place.',
+    },
+    callStack: [],
+  });
+
+  return {
+    algorithm: 'selectionsort',
+    title: 'Selection Sort Algorithm Visualization',
+    category: 'sorting',
+    complexity: {
+      timeBest: 'O(N²)',
+      timeAvg: 'O(N²)',
+      timeWorst: 'O(N²)',
+      space: 'O(1)',
+    },
+    pseudocode,
+    initialState: { array: arr },
+    steps,
+  };
+};
+
+/**
+ * Sorting Algorithms Registry for Dynamic Comparison and Lookup
+ */
+export const SORTING_REGISTRY = {
+  quicksort: {
+    id: 'quicksort',
+    name: 'Quicksort',
+    badge: 'In-Place Partitioning',
+    timeAvg: 'O(N log N)',
+    timeWorst: 'O(N²)',
+    space: 'O(log N)',
+    stable: false,
+    paradigm: 'Divide & Conquer (Pivot Partition)',
+    pros: 'Fastest in practice, cache-friendly, O(1) extra array memory',
+    cons: 'Worst-case O(N²) on sorted arrays with naive pivot',
+    generator: generateQuicksortTrace,
+  },
+  mergesort: {
+    id: 'mergesort',
+    name: 'Mergesort',
+    badge: 'Guaranteed O(N log N)',
+    timeAvg: 'O(N log N)',
+    timeWorst: 'O(N log N)',
+    space: 'O(N)',
+    stable: true,
+    paradigm: 'Divide & Conquer (Subarray Merging)',
+    pros: 'Guaranteed O(N log N) runtime, stable sort (preserves equal item order)',
+    cons: 'Requires O(N) additional auxiliary buffer memory',
+    generator: generateMergeSortTrace,
+  },
+  insertionsort: {
+    id: 'insertionsort',
+    name: 'Insertion Sort',
+    badge: 'Adaptive O(N) Best-Case',
+    timeAvg: 'O(N²)',
+    timeWorst: 'O(N²)',
+    space: 'O(1)',
+    stable: true,
+    paradigm: 'Incremental Insertion',
+    pros: 'O(N) on nearly-sorted data, minimal overhead for small arrays (N <= 16)',
+    cons: 'O(N²) shifts on reversed or random arrays',
+    generator: generateInsertionSortTrace,
+  },
+  selectionsort: {
+    id: 'selectionsort',
+    name: 'Selection Sort',
+    badge: 'Min Swaps O(N)',
+    timeAvg: 'O(N²)',
+    timeWorst: 'O(N²)',
+    space: 'O(1)',
+    stable: false,
+    paradigm: 'Min/Max Scanning',
+    pros: 'Guaranteed at most O(N) memory writes/swaps',
+    cons: 'Always O(N²) comparisons even on sorted arrays',
+    generator: generateSelectionSortTrace,
+  },
+  bubblesort: {
+    id: 'bubblesort',
+    name: 'Bubble Sort',
+    badge: 'Adjacent Swapping',
+    timeAvg: 'O(N²)',
+    timeWorst: 'O(N²)',
+    space: 'O(1)',
+    stable: true,
+    paradigm: 'Adjacent Inversion Elimination',
+    pros: 'Simple invariant, detects already-sorted data in O(N)',
+    cons: 'High number of swaps and comparisons on average',
+    generator: generateBubbleSortTrace,
+  },
+};
+
+/**
+ * Creates dynamic comparative sorting trace for any set of algorithms
+ */
+export const createSortingComparisonTrace = (algorithmIds = ['quicksort', 'mergesort'], customArray) => {
+  const arr = getCleanArray(customArray);
+  const validIds = algorithmIds.filter((id) => SORTING_REGISTRY[id]);
+  const activeIds = validIds.length >= 2 ? validIds : ['quicksort', 'mergesort'];
+
+  const algorithms = activeIds.map((id) => {
+    const meta = SORTING_REGISTRY[id];
+    return {
+      id: meta.id,
+      name: meta.name,
+      badge: meta.badge,
+      timeAvg: meta.timeAvg,
+      timeWorst: meta.timeWorst,
+      space: meta.space,
+      stable: meta.stable,
+      paradigm: meta.paradigm,
+      pros: meta.pros,
+      cons: meta.cons,
+      trace: meta.generator(arr),
+    };
+  });
+
+  const primary = algorithms[0].trace;
+  const titleNames = algorithms.map((a) => a.name).join(' vs ');
+
+  return {
+    ...primary,
+    title: `${titleNames} Execution & Complexity Comparison`,
+    comparison: {
+      isComparison: true,
+      title: `${titleNames} Comparison`,
+      activeAlgorithm: algorithms[0].id,
+      algorithms,
+    },
+  };
+};
+
+/**
+ * 6. Binary Search Trace Generator
  */
 export const generateBinarySearchTrace = (customArray, target = 32) => {
   const raw = getCleanArray(customArray);
@@ -1220,7 +1607,7 @@ export const generateCpuRamTrace = () => {
  * Detects if a question/prompt is asking about an algorithm or data structure
  * and generates the appropriate visualizer trace
  */
-export const detectAndGenerateVisualizationTrace = (text = '') => {
+export const detectAndGenerateVisualizationTrace = (text = '', customArray) => {
   const t = typeof text === 'string' ? text.toLowerCase() : String(text || '').toLowerCase();
 
   // 0. Hardware / Architecture: CPU vs RAM, Memory Hierarchy, Cache
@@ -1234,62 +1621,80 @@ export const detectAndGenerateVisualizationTrace = (text = '') => {
     return generateCpuRamTrace();
   }
 
-  const isQuicksort = t.includes('quicksort') || t.includes('quick sort');
-  const isMergesort = t.includes('mergesort') || t.includes('merge sort');
+  // 1. Detect any mentioned sorting algorithms, ordered by position in prompt
+  const sortPatterns = [
+    { id: 'quicksort', regex: /(quicksort|quick\s*sort|qsort)/i },
+    { id: 'mergesort', regex: /(mergesort|merge\s*sort|msort)/i },
+    { id: 'insertionsort', regex: /(insertionsort|insertion\s*sort|isort)/i },
+    { id: 'selectionsort', regex: /(selectionsort|selection\s*sort|ssort)/i },
+    { id: 'bubblesort', regex: /(bubblesort|bubble\s*sort|bsort)/i },
+  ];
 
-  // 1. Quicksort vs Mergesort Comparison Query
-  if (isQuicksort && isMergesort) {
-    return generateSortingComparisonTrace();
+  const matches = [];
+  for (const p of sortPatterns) {
+    const idx = t.search(p.regex);
+    if (idx !== -1) {
+      matches.push({ id: p.id, index: idx });
+    }
   }
 
-  // 2. Quicksort
-  if (isQuicksort) {
-    return generateQuicksortTrace();
+  matches.sort((a, b) => a.index - b.index);
+  const detectedSorts = matches.map((m) => m.id);
+
+  // If 2 or more sorting algorithms detected (e.g. "selection sort vs insertion sort", "quicksort vs mergesort"):
+  if (detectedSorts.length >= 2) {
+    return createSortingComparisonTrace(detectedSorts, customArray);
   }
 
-  // 3. Mergesort
-  if (isMergesort) {
-    return generateMergeSortTrace();
+  // If exactly 1 sorting algorithm detected:
+  if (detectedSorts.length === 1) {
+    return SORTING_REGISTRY[detectedSorts[0]].generator(customArray);
   }
 
-  // 4. Bubble Sort
-  if (t.includes('bubble sort') || t.includes('bubblesort')) {
-    return generateBubbleSortTrace();
+  // General sorting comparison query (e.g. "compare sorting algorithms", "sorting algorithms comparison"):
+  if (
+    (t.includes('compare') || t.includes('vs') || t.includes('difference')) &&
+    (t.includes('sort') || t.includes('sorting'))
+  ) {
+    return createSortingComparisonTrace(
+      ['quicksort', 'mergesort', 'insertionsort', 'selectionsort', 'bubblesort'],
+      customArray
+    );
   }
 
-  // 5. Binary Search
+  // 2. Binary Search
   if (t.includes('binary search') && !t.includes('tree')) {
-    return generateBinarySearchTrace();
+    return generateBinarySearchTrace(customArray);
   }
 
-  // 6. Recursion / Fibonacci / Call Stack
+  // 3. Recursion / Fibonacci / Call Stack
   if (t.includes('recur') || t.includes('call stack') || t.includes('fibonacci') || t.includes('factorial')) {
     return generateRecursionTrace(4);
   }
 
-  // 7. Breadth-First Search (BFS)
+  // 4. Breadth-First Search (BFS)
   if (t.includes('bfs') || t.includes('breadth first') || t.includes('breadth-first')) {
     return generateBFSTrace();
   }
 
-  // 8. Depth-First Search (DFS)
+  // 5. Depth-First Search (DFS)
   if (t.includes('dfs') || t.includes('depth first') || t.includes('depth-first')) {
     return generateDFSTrace();
   }
 
-  // 9. General Sorting query (e.g. "how do sorting algorithms work", "compare sorting algorithms")
+  // 6. General Sorting query fallback
   if (t.includes('sort') || t.includes('array')) {
-    return generateQuicksortTrace();
+    return generateQuicksortTrace(customArray);
   }
 
-  // 10. General Graph query
+  // 7. General Graph query
   if (t.includes('graph') || t.includes('traversal')) {
     return generateBFSTrace();
   }
 
-  // 11. General Tree query
+  // 8. General Tree query
   if (t.includes('tree') || t.includes('bst')) {
-    return generateBinarySearchTrace();
+    return generateBinarySearchTrace(customArray);
   }
 
   return null;
