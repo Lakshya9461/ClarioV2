@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from 'react';
+import { useReducer, useCallback, useRef } from 'react';
 import { answerReducer, initialState } from '../reducers/answerReducer';
 import { questionApi } from '../services/api';
 import { useModel } from '../context/ModelContext';
@@ -6,6 +6,12 @@ import { useModel } from '../context/ModelContext';
 export const useStreamAnswer = () => {
   const [state, dispatch] = useReducer(answerReducer, initialState);
   const { modelConfig, isCustomActive } = useModel();
+
+  // Always keep a ref to the latest modelConfig so callbacks never use stale closures
+  const modelConfigRef = useRef(modelConfig);
+  const isCustomActiveRef = useRef(isCustomActive);
+  modelConfigRef.current = modelConfig;
+  isCustomActiveRef.current = isCustomActive;
 
   const ask = useCallback(async (rawQuestion) => {
     if (!rawQuestion || !rawQuestion.trim()) return;
@@ -23,7 +29,9 @@ export const useStreamAnswer = () => {
         },
         body: JSON.stringify({
           question: rawQuestion,
-          ...(modelConfig?.model && (modelConfig.enabled || isCustomActive) ? { modelConfig: { ...modelConfig, enabled: true } } : {}),
+          ...(modelConfigRef.current?.model && (modelConfigRef.current.enabled || isCustomActiveRef.current)
+            ? { modelConfig: { ...modelConfigRef.current, enabled: true } }
+            : {}),
         }),
         credentials: 'include',
       });
@@ -142,7 +150,9 @@ export const useStreamAnswer = () => {
         },
         body: JSON.stringify({
           question: followUpText.trim(),
-          ...(modelConfig?.model && (modelConfig.enabled || isCustomActive) ? { modelConfig: { ...modelConfig, enabled: true } } : {}),
+          ...(modelConfigRef.current?.model && (modelConfigRef.current.enabled || isCustomActiveRef.current)
+            ? { modelConfig: { ...modelConfigRef.current, enabled: true } }
+            : {}),
         }),
         credentials: 'include',
       });
@@ -233,7 +243,7 @@ export const useStreamAnswer = () => {
     try {
       const res = await questionApi.simplifyQuestion(
         state.questionId,
-        isCustomActive && modelConfig?.enabled ? modelConfig : undefined
+        isCustomActiveRef.current && modelConfigRef.current?.enabled ? modelConfigRef.current : undefined
       );
       if (res.success && res.simplified) {
         dispatch({

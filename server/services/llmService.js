@@ -155,6 +155,14 @@ export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeou
   let model = process.env.LLM_MODEL || 'qwen3.8-flash-next-gyro-gyro-m';
   let isAnthropic = false;
 
+  // Diagnostic: log what model routing is selected
+  console.log('[callLLM] routing:', JSON.stringify({
+    customEnabled: customConfig?.enabled,
+    customModel: customConfig?.model,
+    customProvider: customConfig?.provider,
+    hasKey: Boolean(customConfig?.apiKey),
+  }));
+
   // Check if custom user-configured model is enabled and provided
   if (customConfig && customConfig.enabled && customConfig.model && customConfig.model.trim()) {
     const prov = (customConfig.provider || 'openai').toLowerCase();
