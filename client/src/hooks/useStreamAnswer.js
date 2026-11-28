@@ -23,7 +23,7 @@ export const useStreamAnswer = () => {
         },
         body: JSON.stringify({
           question: rawQuestion,
-          ...(isCustomActive && modelConfig?.enabled ? { modelConfig } : {}),
+          ...(modelConfig?.model && (modelConfig.enabled || isCustomActive) ? { modelConfig: { ...modelConfig, enabled: true } } : {}),
         }),
         credentials: 'include',
       });
@@ -142,7 +142,7 @@ export const useStreamAnswer = () => {
         },
         body: JSON.stringify({
           question: followUpText.trim(),
-          ...(isCustomActive && modelConfig?.enabled ? { modelConfig } : {}),
+          ...(modelConfig?.model && (modelConfig.enabled || isCustomActive) ? { modelConfig: { ...modelConfig, enabled: true } } : {}),
         }),
         credentials: 'include',
       });

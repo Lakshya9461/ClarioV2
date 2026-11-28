@@ -86,6 +86,7 @@ export const ModelConfigModal = ({ isOpen, onClose }) => {
       provider: providerId,
       apiUrl: preset.defaultApiUrl,
       model: preset.defaultModel || (preset.suggestedModels?.[0] || ''),
+      enabled: true, // Automatically enable custom model when provider is selected
     }));
     setTestResult(null);
   };
@@ -131,8 +132,11 @@ export const ModelConfigModal = ({ isOpen, onClose }) => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    // If a model is provided, auto-enable custom model so queries immediately route to it
+    const shouldEnable = form.enabled || Boolean(form.model.trim() && (form.apiKey.trim() || form.provider === 'ollama' || form.provider === 'custom'));
+
     await updateConfig({
-      enabled: form.enabled,
+      enabled: shouldEnable,
       provider: form.provider,
       apiUrl: form.apiUrl.trim(),
       apiKey: form.apiKey.trim(),

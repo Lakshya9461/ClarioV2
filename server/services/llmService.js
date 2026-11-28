@@ -149,7 +149,7 @@ const parseLlmJson = (raw) => {
 /**
  * Universal caller supporting OpenAI-compatible and Anthropic endpoints
  */
-export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeoutMs = 12000, customConfig = null) => {
+export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeoutMs = 45000, customConfig = null) => {
   let apiUrl = process.env.LLM_API_URL || 'https://strata.lakshya9461.in/v1';
   let apiKey = process.env.LLM_API_KEY || '';
   let model = process.env.LLM_MODEL || 'qwen3.8-flash-next-gyro-gyro-m';
@@ -200,7 +200,11 @@ export const callLLM = async (systemPrompt, userPrompt, maxTokens = 2500, timeou
       messages: [{ role: 'user', content: userPrompt }],
     };
   } else {
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      // Gemini's OpenAI endpoint supports both Authorization: Bearer and x-goog-api-key
+      headers['x-goog-api-key'] = apiKey;
+    }
     body = {
       model,
       messages: [
@@ -1286,6 +1290,96 @@ Both **Quicksort** and **Mergesort** are classical **Divide-and-Conquer** compar
     };
   }
 
+  // 3f. Databases / ACID Transactions
+  if (
+    q.includes('database') ||
+    q.includes('transaction') ||
+    q.includes('acid') ||
+    (q.includes('secure') && (q.includes('db') || q.includes('data') || q.includes('bank') || q.includes('financial') || q.includes('suitable')))
+  ) {
+    return {
+      refinedPrompt:
+        'Provide an authoritative database architectural guide for secure, mission-critical financial transactions. Compare Relational RDBMS (PostgreSQL, MySQL InnoDB) vs Distributed NewSQL (CockroachDB, Google Spanner) vs NoSQL (MongoDB, DynamoDB). Analyze ACID guarantees, Isolation levels (Read Committed vs Serializable SSI), WAL (Write-Ahead Logging), Two-Phase Commit (2PC), and data encryption at rest and in transit.',
+      explanation: `### Database Architecture: Selecting the Optimal Engine for Secure Transactions
+
+For systems handling mission-critical, high-value financial transactions (e.g. banking ledgers, e-commerce checkouts, payment processing), the database engine must provide non-negotiable **ACID guarantees** (Atomicity, Consistency, Isolation, Durability) to prevent double-spending, phantom reads, and dirty state corruptions.
+
+| Architectural Tier | Top Database Recommendation | Transaction Model | Isolation Level Support | Best Use Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **Battle-Tested RDBMS** | **PostgreSQL** | Strict ACID (MVCC + WAL) | Read Committed up to **Serializable (SSI)** | Core banking, payments, fintech backends, order ledgers |
+| **Globally Distributed NewSQL** | **CockroachDB / Google Spanner** | Distributed ACID (Raft Consensus + 2PC) | Strict **Serializable** globally | Multi-region financial ledgers, cloud banking across continents |
+| **Enterprise Relational** | **MySQL (InnoDB Engine)** | Strict ACID (Undo/Redo Logs + Row Locks) | Repeatable Read (Default) up to Serializable | High-throughput web commerce, account balances |
+| **Document / NoSQL** | **MongoDB (v4.0+ Multi-Doc ACID)** | Document-level ACID / Distributed Sessions | Local, Majority, Linearizable | Product catalogs, user profiles (Avoid for primary ledger) |
+
+---
+
+#### 1. The 4 Non-Negotiable ACID Pillars for Secure Transactions
+
+1. **Atomicity (All-or-Nothing Execution)**:
+   - In a fund transfer (Debit Account A by $100; Credit Account B by $100), either **both** operations succeed and commit, or **both** rollback completely.
+   - Enforced via the **WAL (Write-Ahead Log)** and undo segments.
+
+2. **Consistency (State Invariant Enforcement)**:
+   - Database schema invariants, check constraints (e.g. \`balance >= 0\`), and foreign keys are guaranteed true before and after the transaction.
+
+3. **Isolation (Concurrent Execution Safety)**:
+   - Multiple users executing transactions simultaneously must not interfere with each other.
+   - **Serializable Snapshot Isolation (SSI)** in PostgreSQL provides mathematical proof against all concurrency anomalies: Dirty Reads, Non-Repeatable Reads, Phantom Reads, and Write Skew.
+
+4. **Durability (Fault Recovery Guarantee)**:
+   - Once a transaction commits, its modifications are permanently recorded on non-volatile storage.
+   - Even if the server suffers an abrupt power loss 1 millisecond later, the database performs **Crash Recovery (REDO log playback)** upon reboot to restore committed state.
+
+---
+
+#### 2. Why PostgreSQL is the Industry Gold Standard for Secure Transactions
+- **Serializable Snapshot Isolation (SSI)**: Detects write skew dependencies and automatically aborts conflicting transactions without table-wide read locks.
+- **Robust Security Perimeter**: Supports SCRAM-SHA-256 password hashing, SSL/TLS wire encryption, Row-Level Security (RLS), and column-level encryption via \`pgcrypto\`.
+- **Audit Trails**: Full transaction logging with \`pgaudit\` ensures every debit, credit, and administrative query is immutably logged for compliance.
+
+#### 💡 Production Recommendation:
+- Choose **PostgreSQL** for 95% of single-region or primary-replica financial transactional systems.
+- Choose **CockroachDB** if your transaction volume requires horizontal multi-node scaling across multiple cloud data centers while preserving Serializable ACID.`,
+      keyPoints: [
+        'Relational databases with strict ACID compliance (PostgreSQL, CockroachDB, MySQL InnoDB) are mandatory for secure financial transactions.',
+        'PostgreSQL with Serializable Snapshot Isolation (SSI) prevents double-spending and write skew anomalies without coarse table locks.',
+        'For globally distributed cloud banking across multiple continents, Distributed NewSQL (CockroachDB / Spanner) uses Raft consensus and two-phase commit.',
+        'Traditional NoSQL databases (BASE model) prioritize eventual consistency over strict durability and are unsuited for primary financial ledgers.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'ACID Transaction Safety vs Concurrency Overhead Benchmark',
+        labels: ['Read Committed (Fastest)', 'Repeatable Read', 'Serializable SSI (PostgreSQL)', 'Distributed 2PC (CockroachDB)'],
+        values: [85000, 62000, 48000, 24000],
+        datasetLabel: 'Transactions Per Second (TPS)',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['secure transaction database', 'acid compliance postgresql', 'serializable snapshot isolation', 'financial database architecture'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Database Selection for Secure Transactions',
+          subtitle: 'ACID Guarantees, Isolation Levels & Financial Integrity',
+          layout: 'hero',
+          badge: 'Database Architecture',
+          keyConcept: 'Financial transactions demand strict ACID guarantees with Serializable isolation to eliminate dirty reads, race conditions, and double-spending.',
+          bulletPoints: [
+            { heading: 'PostgreSQL Dominance', description: 'Gold standard RDBMS featuring MVCC, Write-Ahead Logging (WAL), and Serializable Snapshot Isolation (SSI).', tag: 'ACID RDBMS' },
+            { heading: 'Distributed NewSQL', description: 'CockroachDB & Spanner provide global multi-region distributed ACID via Raft consensus protocols.', tag: 'Distributed' },
+            { heading: 'Why Not Pure NoSQL?', description: 'Eventual consistency (BASE) allows temporary state divergence unsuitable for immutable ledgers.', tag: 'Integrity' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Gold Standard Rule',
+            description: 'For banking and payments, always enforce PostgreSQL with Serializable isolation or CockroachDB with Raft consensus. Never use eventually consistent databases for monetary ledgers.',
+            type: 'insight',
+          },
+        },
+      ],
+    };
+  }
+
   // 4. Linux vs Windows / Operating Systems
   if (
     (q.includes('linux') && q.includes('windows')) ||
@@ -1749,7 +1843,7 @@ Add academic depth, grade-level hints (Undergraduate B.Tech level), specific asp
 Respond ONLY with the rewritten prompt text. Do not add conversational preamble or quotes.`;
 
   try {
-    const text = await callLLM(systemPrompt, rawQuestion, 800, 12000, customConfig);
+    const text = await callLLM(systemPrompt, rawQuestion, 800, 25000, customConfig);
     if (text && text.trim().length > 10) {
       return text.trim().replace(/^["']|["']$/g, '');
     }
@@ -1831,21 +1925,57 @@ Do not surround output with markdown code ticks or any extra text. Output ONLY v
   const visualizationTrace = detectAndGenerateVisualizationTrace(rawQuestion || refinedPrompt);
 
   try {
-    const rawText = await callLLM(systemPrompt, refinedPrompt, 1800, 10000, customConfig);
-    if (rawText) {
-      const parsed = parseLlmJson(rawText);
+    const rawText = await callLLM(systemPrompt, refinedPrompt, 2200, 45000, customConfig);
+    if (rawText && rawText.trim()) {
+      let parsed = null;
+      try {
+        parsed = parseLlmJson(rawText);
+      } catch (jsonErr) {
+        console.warn(`[LLM Generate Notice] Could not parse strict JSON (${jsonErr.message}). Attempting direct extraction.`);
+      }
 
-      const parsedSlides = sanitizeSlides(parsed.slides, rawQuestion);
+      if (parsed && (parsed.explanation || parsed.content)) {
+        const explanationText = parsed.explanation || parsed.content;
+        const parsedSlides = sanitizeSlides(parsed.slides, rawQuestion);
 
-      return {
-        explanation: parsed.explanation || 'No explanation provided.',
-        keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
-        chartData: sanitizeChartData(parsed.chartData),
-        subjectTag: parsed.subjectTag || inferSubjectTag(rawQuestion || refinedPrompt),
-        searchKeywords: sanitizeSearchKeywords(parsed.searchKeywords, rawQuestion || refinedPrompt),
-        slides: parsedSlides,
-        visualizationTrace,
-      };
+        return {
+          explanation: explanationText,
+          keyPoints: Array.isArray(parsed.keyPoints)
+            ? parsed.keyPoints
+            : Array.isArray(parsed.keyTakeaways)
+            ? parsed.keyTakeaways
+            : [],
+          chartData: sanitizeChartData(parsed.chartData),
+          subjectTag: parsed.subjectTag || inferSubjectTag(rawQuestion || refinedPrompt),
+          searchKeywords: sanitizeSearchKeywords(parsed.searchKeywords, rawQuestion || refinedPrompt),
+          slides: parsedSlides,
+          visualizationTrace,
+        };
+      }
+
+      // If the model output markdown or plain text, DO NOT DISCARD IT! Use the model's actual answer!
+      const cleanedText = rawText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+      if (cleanedText.length > 50) {
+        const lines = cleanedText.split('\n');
+        const bulletLines = lines
+          .filter((l) => /^\s*[-*•\d+.]\s+/.test(l))
+          .map((l) => l.replace(/^\s*[-*•\d+.]\s+/, '').trim())
+          .filter((l) => l.length > 10 && l.length < 200)
+          .slice(0, 4);
+
+        return {
+          explanation: cleanedText,
+          keyPoints: bulletLines.length > 0 ? bulletLines : [
+            'Architectural decisions must be evaluated against production trade-offs.',
+            'Ensure boundary invariants and consistency requirements are strictly verified.',
+          ],
+          chartData: null,
+          subjectTag: inferSubjectTag(rawQuestion || refinedPrompt),
+          searchKeywords: sanitizeSearchKeywords([], rawQuestion || refinedPrompt),
+          slides: [],
+          visualizationTrace,
+        };
+      }
     }
   } catch (err) {
     console.warn(`[LLM Generate Notice] External API call error (${err.message}). Using fallback generator.`);
@@ -1926,15 +2056,35 @@ Respond strictly in valid JSON:
 Do not wrap JSON with extra text.`;
 
   try {
-    const rawText = await callLLM(systemPrompt, followUpQuestion, 2000, 12000, customConfig);
-    if (rawText) {
-      const parsed = parseLlmJson(rawText);
-      if (parsed && parsed.content) {
+    const rawText = await callLLM(systemPrompt, followUpQuestion, 2000, 40000, customConfig);
+    if (rawText && rawText.trim()) {
+      let parsed = null;
+      try {
+        parsed = parseLlmJson(rawText);
+      } catch (jsonErr) {
+        console.warn(`[LLM FollowUp Notice] Could not parse strict JSON (${jsonErr.message}). Using raw model output.`);
+      }
+
+      if (parsed && (parsed.content || parsed.explanation)) {
         return {
-          content: parsed.content,
-          keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
+          content: parsed.content || parsed.explanation,
+          keyTakeaways: Array.isArray(parsed.keyTakeaways)
+            ? parsed.keyTakeaways
+            : Array.isArray(parsed.keyPoints)
+            ? parsed.keyPoints
+            : [],
           slides: sanitizeSlides(parsed.slides || []),
           chartData: sanitizeChartData(parsed.chartData),
+        };
+      }
+
+      const cleanedText = rawText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+      if (cleanedText.length > 25) {
+        return {
+          content: cleanedText,
+          keyTakeaways: [],
+          slides: [],
+          chartData: null,
         };
       }
     }
@@ -1945,6 +2095,86 @@ Do not wrap JSON with extra text.`;
   // Fallback intelligent answers for follow-ups
   const f = followUpQuestion.toLowerCase();
   const orig = (rawOriginalQuestion || '').toLowerCase();
+
+  // Follow-up: When to use Mergesort over Quicksort
+  if (
+    (f.includes('mergesort') && (f.includes('quicksort') || f.includes('when') || f.includes('why') || f.includes('instead') || f.includes('prefer') || f.includes('use'))) ||
+    (f.includes('when should i use') && (f.includes('merge') || f.includes('quick')))
+  ) {
+    return {
+      content: `### When to Choose Mergesort Over Quicksort (Engineering Decision Framework)
+
+In systems architecture and software engineering interviews, choosing between **Mergesort** and **Quicksort** is a classic case study in **guaranteed worst-case bounds vs average CPU cache throughput**.
+
+---
+
+#### 1. Decisive Scenarios: When You Must Use Mergesort
+
+1. **Guaranteed $O(N \\log N)$ Worst-Case Latency Is Required (SLA / Safety-Critical Systems)**
+   - Quicksort suffers from a pathological **$O(N^2)$ worst-case time** on poor pivot choices (e.g. already sorted data with naive partitioning, or adversarial inputs crafted to trigger Denial-of-Service).
+   - Mergesort **strictly guarantees $O(N \\log N)$** comparisons regardless of initial data order. Use it in real-time avionics, medical systems, and latency-sensitive network services.
+
+2. **Algorithmic Stability Is Mandatory (Multi-Column Database Sorting)**
+   - Mergesort is **Stable**: two items with identical keys maintain their relative original input order.
+   - Standard Quicksort is **Unstable**: pointer swaps displace identical elements across partitions.
+   - *Example*: Sorting database records by \`Date\` first, then by \`Customer Name\`. Mergesort preserves the sub-ordering; Quicksort scrambles it.
+
+3. **Sorting Linked Lists ($O(1)$ Extra Space Advantage!)**
+   - On arrays, Mergesort requires $O(N)$ extra memory for the merge buffer.
+   - But on singly or doubly **Linked Lists**, Mergesort can merge nodes simply by reconnecting pointers (\`next\` / \`prev\`) **in-place with $O(1)$ auxiliary space**!
+   - Quicksort requires random memory access ($O(1)$ index lookup like \`arr[j]\`), which linked lists cannot provide ($O(N)$ traversal per index).
+
+4. **External Sorting (Datasets Larger than Physical RAM)**
+   - When sorting 500 GB of logs on a machine with 16 GB of RAM, data resides on disk blocks.
+   - **External K-Way Merge Sort** streams contiguous chunks sequentially into RAM, sorts them, and merges them back to disk with sequential block I/O. Quicksort's random memory jumps cause catastrophic disk thrashing.
+
+---
+
+#### 2. When Should You Prefer Quicksort Instead?
+- **In-Memory Arrays Where Memory Space Is Constrained**: Quicksort sorts **in-place** with only $O(\\log N)$ call-stack space, whereas array Mergesort consumes an extra $O(N)$ allocation buffer.
+- **Raw CPU Performance**: Quicksort is **2x–3x faster** on modern CPU architectures due to sequential spatial cache locality in CPU L1/L2 caches and low constant comparison factors.
+
+---
+
+#### 💡 Summary viva cheat sheet:
+| Criterion | Winner | Engineering Rationale |
+| :--- | :--- | :--- |
+| **Guaranteed Time Guarantee** | **Mergesort** | Guaranteed $O(N \\log N)$ vs Quicksort's $O(N^2)$ worst case |
+| **Stability (preserves equal keys)** | **Mergesort** | Strictly preserves equal keys without extra comparator logic |
+| **Sorting Linked Lists** | **Mergesort** | In-place node pointer rewiring with $O(1)$ extra memory |
+| **External Disk Datasets** | **Mergesort** | Sequential stream access avoids random I/O thrashing |
+| **In-Memory Arrays & Speed** | **Quicksort** | Zero auxiliary array allocation + superior CPU cache line reuse |`,
+      keyTakeaways: [
+        'Use Mergesort when guaranteed O(N log N) time bounds or algorithmic stability are required.',
+        'Mergesort is the optimal choice for sorting Linked Lists because it rewires pointers in O(1) extra space.',
+        'External Sorting for datasets larger than RAM relies on K-way Mergesort.',
+        'Use Quicksort for in-memory arrays when memory footprint and raw CPU cache throughput dominate.',
+      ],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Mergesort vs Quicksort: Decision Matrix',
+          subtitle: 'Architectural criteria for selecting the optimal sorting engine',
+          layout: 'hero',
+          badge: 'Production Decision',
+          keyConcept: 'Mergesort wins on stability, worst-case latency guarantees, linked lists, and external datasets; Quicksort wins on in-memory array cache speed.',
+          bulletPoints: [
+            { heading: 'Guaranteed Worst-Case', description: 'Strict O(N log N) prevents adversarial DoS attacks and worst-case degradations.', tag: 'Safety' },
+            { heading: 'Stability Preserved', description: 'Preserves order of equal keys across multi-column database sorting passes.', tag: 'Stable' },
+            { heading: 'Linked Lists & External', description: 'O(1) extra space on linked lists and sequential block streaming for disk data.', tag: 'Streaming' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Exam Invariant',
+            description: 'Why is Mergesort preferred for linked lists? Because we can insert items in the middle and merge nodes in O(1) space by updating next pointers, without needing random array access.',
+            type: 'insight',
+          },
+        },
+      ],
+      chartData: null,
+    };
+  }
 
   // Follow-up: Memory leak in C
   if (f.includes('memory leak') || (f.includes('leak') && f.includes('c'))) {

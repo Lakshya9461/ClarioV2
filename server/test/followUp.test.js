@@ -35,4 +35,30 @@ describe('Follow-Up & Knowledge Base Fallback', () => {
     assert.ok(algIds.includes('selectionsort'));
     assert.ok(algIds.includes('insertionsort'));
   });
+
+  it('should answer when to choose Mergesort over Quicksort directly rather than repeating static comparison', async () => {
+    const parentTopic = 'Quicksort vs Mergesort';
+    const followUp = 'When should I use Mergesort instead of Quicksort?';
+
+    const answer = await generateFollowUpAnswer(followUp, [], parentTopic, null);
+    assert.ok(answer.content.includes('When to Choose Mergesort Over Quicksort'));
+    assert.ok(answer.content.includes('Linked Lists'));
+    assert.ok(answer.content.includes('Stability') || answer.content.includes('Stable'));
+    assert.ok(!answer.content.includes('Recite syntax'));
+    assert.ok(Array.isArray(answer.keyTakeaways));
+    assert.ok(answer.keyTakeaways.length > 0);
+  });
+
+  it('should generate deep technical breakdown for database secure transactions', async () => {
+    const query = 'can you tell me which database is suitable for secure transactions';
+    const { generateStructuredAnswer } = await import('../services/llmService.js');
+    const answer = await generateStructuredAnswer(query, query, null);
+
+    assert.ok(answer.explanation.includes('ACID') || answer.explanation.includes('PostgreSQL'));
+    assert.ok(answer.explanation.includes('PostgreSQL'));
+    assert.ok(answer.explanation.includes('Serializable') || answer.explanation.includes('CockroachDB'));
+    assert.ok(!answer.explanation.includes('Mastering can you tell me'));
+    assert.ok(Array.isArray(answer.keyPoints));
+    assert.ok(answer.keyPoints.length >= 2);
+  });
 });

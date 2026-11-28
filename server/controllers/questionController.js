@@ -32,6 +32,12 @@ export const askQuestion = async (req, res, next) => {
   const { question: rawQuestion, parentQuestionId, modelConfig } = req.body;
   const customModelConfig = modelConfig || req.user?.customModel || null;
 
+  if (customModelConfig?.enabled && customModelConfig?.model) {
+    console.log(`[AI Pipeline] Active custom model: ${customModelConfig.provider} -> ${customModelConfig.model}`);
+  } else {
+    console.log('[AI Pipeline] Active system model / fallback engine');
+  }
+
   if (parentQuestionId) {
     return handleFollowUpStream(req, res, parentQuestionId, rawQuestion, customModelConfig);
   }
