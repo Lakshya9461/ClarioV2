@@ -2,7 +2,7 @@
 > **Full Stack MERN Portal with Local LLM Prompt Engineering, Server-Sent Events (SSE), Redis Caching & Rate Limiting, and Teacher Curriculum Analytics.**
 >
 > **Project:** Full Stack Application Development  
-> **Team Size:** 3 Members  
+> **Team Size:** 2 Members  
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-v20+-green.svg)](https://nodejs.org/)
