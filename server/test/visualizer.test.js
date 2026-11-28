@@ -3,6 +3,8 @@ import assert from 'node:assert';
 import {
   detectAndGenerateVisualizationTrace,
   generateQuicksortTrace,
+  generateMergeSortTrace,
+  generateSortingComparisonTrace,
   generateBubbleSortTrace,
   generateBinarySearchTrace,
   generateRecursionTrace,
@@ -26,6 +28,33 @@ describe('Algorithm Visualizer Service', () => {
     const initialStep = trace.steps[0];
     assert.strictEqual(initialStep.state.action, 'INIT');
     assert.ok(Array.isArray(initialStep.state.array));
+  });
+
+  it('should generate valid mergesort trace', () => {
+    const trace = generateMergeSortTrace([38, 27, 43, 3, 9, 82, 10]);
+    assert.strictEqual(trace.algorithm, 'mergesort');
+    assert.strictEqual(trace.category, 'sorting');
+    assert.ok(Array.isArray(trace.steps));
+    assert.ok(trace.steps.length > 10);
+    assert.ok(trace.pseudocode.length > 0);
+    assert.strictEqual(trace.complexity.timeWorst, 'O(N log N)');
+    assert.strictEqual(trace.complexity.space, 'O(N)');
+
+    const divideStep = trace.steps.find((s) => s.state?.action === 'DIVIDE');
+    assert.ok(divideStep);
+    const lastStep = trace.steps[trace.steps.length - 1];
+    assert.strictEqual(lastStep.state.action, 'DONE');
+  });
+
+  it('should generate valid sorting comparison trace with both algorithms', () => {
+    const trace = generateSortingComparisonTrace([38, 27, 43, 3, 9, 82, 10]);
+    assert.ok(trace.comparison);
+    assert.strictEqual(trace.comparison.isComparison, true);
+    assert.strictEqual(trace.comparison.algorithms.length, 2);
+    assert.strictEqual(trace.comparison.algorithms[0].id, 'quicksort');
+    assert.strictEqual(trace.comparison.algorithms[1].id, 'mergesort');
+    assert.ok(trace.comparison.algorithms[0].trace.steps.length > 0);
+    assert.ok(trace.comparison.algorithms[1].trace.steps.length > 0);
   });
 
   it('should generate valid bubble sort trace', () => {
@@ -92,6 +121,16 @@ describe('Algorithm Visualizer Service', () => {
     const qsortTrace = detectAndGenerateVisualizationTrace('How does quicksort partition work?');
     assert.ok(qsortTrace);
     assert.strictEqual(qsortTrace.algorithm, 'quicksort');
+
+    const msortTrace = detectAndGenerateVisualizationTrace('Explain mergesort step by step');
+    assert.ok(msortTrace);
+    assert.strictEqual(msortTrace.algorithm, 'mergesort');
+
+    const comparisonTrace = detectAndGenerateVisualizationTrace('compare quicksort and mergesort time complexity & stability');
+    assert.ok(comparisonTrace);
+    assert.ok(comparisonTrace.comparison);
+    assert.strictEqual(comparisonTrace.comparison.isComparison, true);
+    assert.strictEqual(comparisonTrace.comparison.algorithms.length, 2);
 
     const bsearchTrace = detectAndGenerateVisualizationTrace('Explain binary search on sorted array');
     assert.ok(bsearchTrace);

@@ -194,7 +194,276 @@ export const generateQuicksortTrace = (customArray) => {
 };
 
 /**
- * 2. Bubble Sort Trace Generator
+ * 2. Mergesort Trace Generator (Divide and Conquer)
+ */
+export const generateMergeSortTrace = (customArray) => {
+  const arr = getCleanArray(customArray);
+  const steps = [];
+  let stepCount = 1;
+
+  const pseudocode = [
+    'function mergesort(arr, low, high):',
+    '  if low < high:',
+    '    mid = floor((low + high) / 2)',
+    '    mergesort(arr, low, mid)',
+    '    mergesort(arr, mid + 1, high)',
+    '    merge(arr, low, mid, high)',
+    'function merge(arr, low, mid, high):',
+    '  temp = [], i = low, j = mid + 1',
+    '  while i <= mid and j <= high:',
+    '    if arr[i] <= arr[j]: temp.push(arr[i++])',
+    '    else: temp.push(arr[j++])',
+    '  copy remaining and write temp back to arr[low..high]',
+  ];
+
+  const callStack = [{ fn: 'mergesort', args: `low=0, high=${arr.length - 1}`, line: 1 }];
+
+  // Step 0: Initial state
+  steps.push({
+    stepNumber: stepCount++,
+    description: `Start Mergesort on array of ${arr.length} elements (Divide & Conquer).`,
+    codeLine: 0,
+    state: {
+      array: arr.map((val, idx) => ({ value: val, index: idx, status: 'default' })),
+      pointers: { low: 0, high: arr.length - 1 },
+      action: 'INIT',
+      actionMessage: 'Array loaded for Mergesort.',
+    },
+    callStack: [...callStack],
+  });
+
+  const a = [...arr];
+
+  const merge = (low, mid, high) => {
+    callStack.push({ fn: 'merge', args: `low=${low}, mid=${mid}, high=${high}`, line: 5 });
+
+    steps.push({
+      stepNumber: stepCount++,
+      description: `Merging sorted subarrays [${low}..${mid}] and [${mid + 1}..${high}].`,
+      codeLine: 5,
+      state: {
+        array: a.map((val, idx) => ({
+          value: val,
+          index: idx,
+          status: idx >= low && idx <= mid ? 'subrange' : idx > mid && idx <= high ? 'comparing' : 'default',
+        })),
+        pointers: { low, mid, high, i: low, j: mid + 1 },
+        action: 'MERGE_START',
+        actionMessage: `Combine left [${low}..${mid}] and right [${mid + 1}..${high}].`,
+      },
+      callStack: [...callStack],
+    });
+
+    const temp = [];
+    let i = low;
+    let j = mid + 1;
+
+    while (i <= mid && j <= high) {
+      const takeLeft = a[i] <= a[j];
+      steps.push({
+        stepNumber: stepCount++,
+        description: `Comparing left arr[${i}] (${a[i]}) with right arr[${j}] (${a[j]}). Take ${takeLeft ? `left ${a[i]}` : `right ${a[j]}`}.`,
+        codeLine: 9,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx === i || idx === j ? 'comparing' : idx >= low && idx <= high ? 'subrange' : 'default',
+          })),
+          pointers: { low, mid, high, i, j },
+          action: 'COMPARE',
+          actionMessage: `${a[i]} ${takeLeft ? '<=' : '>'} ${a[j]}`,
+        },
+        callStack: [...callStack],
+      });
+
+      if (takeLeft) {
+        temp.push(a[i]);
+        i++;
+      } else {
+        temp.push(a[j]);
+        j++;
+      }
+    }
+
+    while (i <= mid) {
+      steps.push({
+        stepNumber: stepCount++,
+        description: `Append remaining left element arr[${i}] (${a[i]}) to merged buffer.`,
+        codeLine: 11,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx === i ? 'subrange' : idx >= low && idx <= high ? 'subrange' : 'default',
+          })),
+          pointers: { low, mid, high, i },
+          action: 'APPEND_LEFT',
+          actionMessage: `Left remaining: ${a[i]}`,
+        },
+        callStack: [...callStack],
+      });
+      temp.push(a[i]);
+      i++;
+    }
+
+    while (j <= high) {
+      steps.push({
+        stepNumber: stepCount++,
+        description: `Append remaining right element arr[${j}] (${a[j]}) to merged buffer.`,
+        codeLine: 11,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx === j ? 'subrange' : idx >= low && idx <= high ? 'subrange' : 'default',
+          })),
+          pointers: { low, mid, high, j },
+          action: 'APPEND_RIGHT',
+          actionMessage: `Right remaining: ${a[j]}`,
+        },
+        callStack: [...callStack],
+      });
+      temp.push(a[j]);
+      j++;
+    }
+
+    // Write back to main array
+    for (let k = 0; k < temp.length; k++) {
+      a[low + k] = temp[k];
+      const isFinalRange = low === 0 && high === a.length - 1;
+      steps.push({
+        stepNumber: stepCount++,
+        description: `Write merged value ${temp[k]} back to arr[${low + k}].`,
+        codeLine: 11,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx === low + k ? 'swapping' : idx >= low && idx <= high ? (isFinalRange ? 'sorted' : 'subrange') : 'default',
+          })),
+          pointers: { low, high, k: low + k },
+          action: 'MERGE_WRITE',
+          actionMessage: `arr[${low + k}] = ${temp[k]}`,
+        },
+        callStack: [...callStack],
+      });
+    }
+
+    callStack.pop();
+  };
+
+  const mergesort = (low, high) => {
+    if (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      callStack.push({ fn: 'mergesort', args: `low=${low}, high=${high}`, line: 2 });
+
+      steps.push({
+        stepNumber: stepCount++,
+        description: `Divide range [${low}..${high}] at mid=${mid} into [${low}..${mid}] and [${mid + 1}..${high}].`,
+        codeLine: 2,
+        state: {
+          array: a.map((val, idx) => ({
+            value: val,
+            index: idx,
+            status: idx >= low && idx <= high ? 'subrange' : 'default',
+          })),
+          pointers: { low, mid, high },
+          action: 'DIVIDE',
+          actionMessage: `Subarray [${low}..${high}] split at mid=${mid}.`,
+        },
+        callStack: [...callStack],
+      });
+
+      mergesort(low, mid);
+      mergesort(mid + 1, high);
+      merge(low, mid, high);
+
+      callStack.pop();
+    }
+  };
+
+  mergesort(0, a.length - 1);
+
+  // Final step: sorted
+  steps.push({
+    stepNumber: stepCount++,
+    description: 'Mergesort completed. All subarrays merged in guaranteed O(N log N) time.',
+    codeLine: 5,
+    state: {
+      array: a.map((val, idx) => ({ value: val, index: idx, status: 'sorted' })),
+      pointers: {},
+      action: 'DONE',
+      actionMessage: 'Array is completely sorted.',
+    },
+    callStack: [],
+  });
+
+  return {
+    algorithm: 'mergesort',
+    title: 'Mergesort Algorithm Visualization',
+    category: 'sorting',
+    complexity: {
+      timeBest: 'O(N log N)',
+      timeAvg: 'O(N log N)',
+      timeWorst: 'O(N log N)',
+      space: 'O(N)',
+    },
+    pseudocode,
+    initialState: { array: arr },
+    steps,
+  };
+};
+
+/**
+ * Quicksort vs Mergesort Comparison Trace
+ */
+export const generateSortingComparisonTrace = (customArray) => {
+  const arr = getCleanArray(customArray);
+  const quicksortTrace = generateQuicksortTrace(arr);
+  const mergesortTrace = generateMergeSortTrace(arr);
+
+  return {
+    ...quicksortTrace,
+    title: 'Quicksort vs Mergesort Execution & Complexity Comparison',
+    comparison: {
+      isComparison: true,
+      title: 'Quicksort vs Mergesort Comparison',
+      activeAlgorithm: 'quicksort',
+      algorithms: [
+        {
+          id: 'quicksort',
+          name: 'Quicksort',
+          badge: 'In-Place Partitioning',
+          timeAvg: 'O(N log N)',
+          timeWorst: 'O(N²)',
+          space: 'O(log N)',
+          stable: false,
+          paradigm: 'Divide & Conquer (Pivot Partitioning)',
+          pros: 'Cache-friendly, zero auxiliary memory array needed',
+          cons: 'Degrades to O(N²) on bad pivot choices (already sorted array)',
+          trace: quicksortTrace,
+        },
+        {
+          id: 'mergesort',
+          name: 'Mergesort',
+          badge: 'Guaranteed O(N log N)',
+          timeAvg: 'O(N log N)',
+          timeWorst: 'O(N log N)',
+          space: 'O(N)',
+          stable: true,
+          paradigm: 'Divide & Conquer (Subarray Merging)',
+          pros: 'Guaranteed O(N log N) worst-case, preserves relative order (stable)',
+          cons: 'Requires O(N) additional auxiliary buffer memory',
+          trace: mergesortTrace,
+        },
+      ],
+    },
+  };
+};
+
+/**
+ * 3. Bubble Sort Trace Generator
  */
 export const generateBubbleSortTrace = (customArray) => {
   const arr = getCleanArray(customArray);
@@ -956,8 +1225,7 @@ export const detectAndGenerateVisualizationTrace = (text = '') => {
 
   // 0. Hardware / Architecture: CPU vs RAM, Memory Hierarchy, Cache
   if (
-    t.includes('cpu') ||
-    t.includes('ram') ||
+    (t.includes('cpu') && t.includes('ram')) ||
     t.includes('memory hierarchy') ||
     t.includes('hardware') ||
     t.includes('cache') ||
@@ -966,47 +1234,60 @@ export const detectAndGenerateVisualizationTrace = (text = '') => {
     return generateCpuRamTrace();
   }
 
-  // 1. Quicksort
-  if (t.includes('quicksort') || t.includes('quick sort')) {
+  const isQuicksort = t.includes('quicksort') || t.includes('quick sort');
+  const isMergesort = t.includes('mergesort') || t.includes('merge sort');
+
+  // 1. Quicksort vs Mergesort Comparison Query
+  if (isQuicksort && isMergesort) {
+    return generateSortingComparisonTrace();
+  }
+
+  // 2. Quicksort
+  if (isQuicksort) {
     return generateQuicksortTrace();
   }
 
-  // 2. Bubble Sort
+  // 3. Mergesort
+  if (isMergesort) {
+    return generateMergeSortTrace();
+  }
+
+  // 4. Bubble Sort
   if (t.includes('bubble sort') || t.includes('bubblesort')) {
     return generateBubbleSortTrace();
   }
 
-  // 3. Binary Search
+  // 5. Binary Search
   if (t.includes('binary search') && !t.includes('tree')) {
     return generateBinarySearchTrace();
   }
 
-  // 4. Recursion / Fibonacci / Call Stack
+  // 6. Recursion / Fibonacci / Call Stack
   if (t.includes('recur') || t.includes('call stack') || t.includes('fibonacci') || t.includes('factorial')) {
     return generateRecursionTrace(4);
   }
 
-  // 5. Breadth-First Search (BFS)
+  // 7. Breadth-First Search (BFS)
   if (t.includes('bfs') || t.includes('breadth first') || t.includes('breadth-first')) {
     return generateBFSTrace();
   }
 
-  // 6. Depth-First Search (DFS)
+  // 8. Depth-First Search (DFS)
   if (t.includes('dfs') || t.includes('depth first') || t.includes('depth-first')) {
     return generateDFSTrace();
   }
 
-  // 7. General Sorting query (e.g. "how do sorting algorithms work", "compare sorting algorithms")
+  // 9. General Sorting query (e.g. "how do sorting algorithms work", "compare sorting algorithms")
   if (t.includes('sort') || t.includes('array')) {
     return generateQuicksortTrace();
   }
 
-  // 8. General Graph query
+  // 10. General Graph query
   if (t.includes('graph') || t.includes('traversal')) {
     return generateBFSTrace();
   }
 
-  // 9. General Tree query
+  // 11. General Tree query
   if (t.includes('tree') || t.includes('bst')) {
     return generateBinarySearchTrace();
   }

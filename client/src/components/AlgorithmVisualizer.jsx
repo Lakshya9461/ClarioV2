@@ -22,7 +22,33 @@ import {
 } from 'lucide-react';
 
 export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
-  if (!trace || !Array.isArray(trace.steps) || trace.steps.length === 0) {
+  const [selectedAlgorithmId, setSelectedAlgorithmId] = useState(() => {
+    return trace?.comparison?.activeAlgorithm || trace?.algorithm || 'quicksort';
+  });
+
+  // Sync selected algorithm if trace prop changes
+  useEffect(() => {
+    if (trace?.comparison?.activeAlgorithm) {
+      setSelectedAlgorithmId(trace.comparison.activeAlgorithm);
+    } else if (trace?.algorithm) {
+      setSelectedAlgorithmId(trace.algorithm);
+    }
+  }, [trace]);
+
+  const activeTrace = useMemo(() => {
+    if (trace?.comparison?.algorithms && Array.isArray(trace.comparison.algorithms)) {
+      const match = trace.comparison.algorithms.find((a) => a.id === selectedAlgorithmId);
+      if (match?.trace) {
+        return {
+          ...match.trace,
+          comparison: trace.comparison,
+        };
+      }
+    }
+    return trace;
+  }, [trace, selectedAlgorithmId]);
+
+  if (!activeTrace || !Array.isArray(activeTrace.steps) || activeTrace.steps.length === 0) {
     return (
       <div
         role="region"
@@ -32,13 +58,13 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
         <Activity className="w-10 h-10 text-slate-600 mx-auto mb-2" />
         <p className="text-sm font-semibold text-white">No Visualization Trace Available</p>
         <p className="text-xs text-slate-500 mt-1 font-sans">
-          Ask an algorithm question (e.g. Quicksort, Binary Search, BFS, or Recursion) to generate a step-by-step visual trace.
+          Ask an algorithm question (e.g. Quicksort, Mergesort, Binary Search, BFS, or Recursion) to generate a step-by-step visual trace.
         </p>
       </div>
     );
   }
 
-  const { algorithm, title, category, complexity, pseudocode = [], steps = [] } = trace;
+  const { algorithm, title, category, complexity, pseudocode = [], steps = [] } = activeTrace;
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -48,6 +74,14 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
   const containerRef = useRef(null);
   const pseudocodeContainerRef = useRef(null);
   const codeLinesRef = useRef([]);
+
+  // Handle switching algorithm tab in comparison mode
+  const handleSelectAlgorithm = useCallback((algoId) => {
+    if (algoId === selectedAlgorithmId) return;
+    setSelectedAlgorithmId(algoId);
+    setCurrentStepIndex(0);
+    setIsPlaying(false);
+  }, [selectedAlgorithmId]);
 
   // Handle Play/Pause
   const togglePlay = useCallback(() => {
@@ -224,6 +258,63 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
         </div>
       </div>
 
+      {/* ── Comparison Switcher Banner (when comparing e.g. Quicksort vs Mergesort) ── */}
+      {trace?.comparison?.algorithms?.length > 1 && (
+        <div className="px-4 sm:px-5 py-2.5 bg-[#0e1526] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <GitGraph className="w-3.5 h-3.5 text-blue-400" /> Compare:
+            </span>
+            <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#070b12] border border-slate-800">
+              {trace.comparison.algorithms.map((algo) => {
+                const isSelected = selectedAlgorithmId === algo.id;
+                return (
+                  <button
+                    key={algo.id}
+                    type="button"
+                    onClick={() => handleSelectAlgorithm(algo.id)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none flex items-center gap-2 ${
+                      isSelected
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <span>{algo.name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-normal ${isSelected ? 'bg-blue-700/80 text-blue-100' : 'bg-slate-800 text-slate-400'}`}>
+                      {algo.badge}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Comparative Metrics / Trade-offs */}
+          <div className="text-[11px] font-mono text-slate-400 hidden lg:flex items-center gap-3">
+            <span>
+              In-Place:{' '}
+              <strong className={selectedAlgorithmId === 'quicksort' ? 'text-emerald-400' : 'text-slate-300'}>
+                {selectedAlgorithmId === 'quicksort' ? 'Yes (O(1) aux)' : 'No (O(N) aux)'}
+              </strong>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span>
+              Stable:{' '}
+              <strong className={selectedAlgorithmId === 'mergesort' ? 'text-emerald-400' : 'text-amber-400'}>
+                {selectedAlgorithmId === 'mergesort' ? 'Yes' : 'No'}
+              </strong>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span>
+              Worst-Case:{' '}
+              <strong className={selectedAlgorithmId === 'mergesort' ? 'text-emerald-400' : 'text-rose-400'}>
+                {selectedAlgorithmId === 'mergesort' ? 'O(N log N)' : 'O(N²)'}
+              </strong>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── Main Interactive Split Screen ── */}
       <div className={`grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-800 ${isFullscreen ? 'flex-1 overflow-hidden' : ''}`}>
         {/* ── Left / Center: Visual Data Structure Canvas (Col 7) ── */}
@@ -292,6 +383,9 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
                         {state.pointers?.j === idx && (
                           <span className="px-1 py-0.2 text-[9px] font-mono font-bold bg-emerald-500 text-white rounded">j</span>
                         )}
+                        {state.pointers?.k === idx && (
+                          <span className="px-1 py-0.2 text-[9px] font-mono font-bold bg-cyan-500 text-black rounded">k</span>
+                        )}
                       </div>
                     </div>
                   );
@@ -304,6 +398,7 @@ export const AlgorithmVisualizer = ({ trace, customPrompt = '' }) => {
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-400" /> Comparing</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-rose-500" /> Swapping</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-purple-600" /> Pivot</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-blue-500" /> Subarray</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-500" /> Sorted</span>
               </div>
             </div>
