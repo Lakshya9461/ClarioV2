@@ -1704,128 +1704,289 @@ Modern gaming distros default to **Wayland** paired with Valve's **Gamescope** m
     };
   }
 
-  // 6. Clean Dynamic Synthesis for Any Other Question
+  // 6. Rust Language: Why Rust is Fast / Memory Safety / Ownership
+  if (
+    q.includes('rust') &&
+    !q.includes('rusting') && !q.includes('rust metal') && !q.includes('iron oxide')
+  ) {
+    return {
+      refinedPrompt:
+        'Provide a rigorous, in-depth technical explanation of why Rust is considered a high-performance systems programming language. Cover the ownership model and borrow checker (zero-cost memory safety at compile time), zero-cost abstractions, LLVM backend optimizations, absence of a garbage collector, fearless concurrency, and direct comparison against C, C++, and Go from a performance standpoint with benchmarks.',
+      explanation: `### Why Rust is Fast: Zero-Cost Abstractions & Systems-Level Performance
+
+**Rust** achieves **C/C++-equivalent native performance** while simultaneously eliminating entire classes of memory-safety bugs, with no runtime garbage collector tax. It is now the **most loved programming language in the Stack Overflow Developer Survey for 9 consecutive years** and powers Linux kernel drivers, the Firefox engine, Windows components, and AWS cloud infrastructure.
+
+| Performance Dimension | Rust | C / C++ | Go | Java / JVM |
+| :--- | :--- | :--- | :--- | :--- |
+| **Garbage Collector** | **None** (Compile-time ownership) | None (Manual malloc/free) | Tri-color mark-sweep GC | Generational GC (Stop-the-World pauses) |
+| **Memory Safety** | **Compile-time borrow checker** | Manual (buffer overflows, UAF) | Partial (GC prevents UAF) | GC-managed heap (no raw pointers) |
+| **Runtime Overhead** | **Near-zero** | Near-zero | GC pause latency (~1-10ms) | JVM warm-up + GC pauses |
+| **Thread Safety** | **Fearless Concurrency** (compile-time race detection) | Race conditions at runtime | \`sync\` primitives | \`synchronized\`, \`volatile\` |
+| **Abstraction Cost** | **Zero-cost** (monomorphized generics) | Template instantiation (overhead at link time) | Runtime interface dispatch (vtable) | Virtual method dispatch (JVM bytecode) |
+| **Binary Output** | Native ELF/PE binary (no VM required) | Native ELF/PE binary | Native binary + small Go runtime | JVM bytecode + JIT |
+
+---
+
+#### 1. The Ownership Model: Compile-Time Memory Management (No GC Required!)
+Every value in Rust has exactly **one owner**. When ownership passes out of scope, the memory is **automatically freed** by the compiler inserting \`drop()\` calls at compile time — not at runtime.
+
+\`\`\`rust
+fn main() {
+    let s1 = String::from("hello");  // s1 OWNS the heap allocation
+    let s2 = s1;                      // Ownership MOVES to s2 (s1 is now invalid!)
+    // println!("{}", s1);            // COMPILE ERROR: use after move!
+    println!("{}", s2);              // OK: s2 owns the data
+}  // s2 goes out of scope -> Rust inserts free(s2) automatically
+\`\`\`
+
+**Why this gives C-equivalent speed with no GC:** The allocator is called once at construction and once at drop — identical to what a disciplined C programmer writes manually. No garbage collection thread runs in the background, so there are **zero stop-the-world latency pauses**.
+
+---
+
+#### 2. The Borrow Checker: Zero-Cost Safety at Compile Time
+The borrow checker enforces two invariants **at compile time** (zero runtime overhead):
+1. You can have **either one mutable reference** OR **any number of shared (read-only) references** — never both simultaneously.
+2. References must **never outlive** the data they point to (eliminates dangling pointers / use-after-free).
+
+\`\`\`rust
+fn main() {
+    let mut v = vec![1, 2, 3];
+    let r1 = &v;         // Immutable borrow OK
+    let r2 = &v;         // Another immutable borrow OK
+    // let rm = &mut v;  // COMPILE ERROR: cannot borrow as mutable while borrowed as immutable
+    println!("{} {}", r1[0], r2[0]);
+}
+\`\`\`
+
+---
+
+#### 3. Zero-Cost Abstractions: Generics vs Java Interfaces
+Rust generics are **monomorphized** at compile time — the compiler generates specialized code for every concrete type, eliminating virtual dispatch overhead:
+\`\`\`rust
+fn max<T: PartialOrd>(a: T, b: T) -> T {
+    if a > b { a } else { b }
+}
+// At compile-time, Rust generates max_i32(), max_f64(), max_str() — each fully inlined
+// No vtable lookup. No heap boxing. Pure direct function call. Zero overhead vs a hand-written version.
+\`\`\`
+
+---
+
+#### 4. LLVM Backend Optimization
+Rust compiles through **LLVM** (Low Level Virtual Machine), the same battle-tested optimizer used by Clang/C++ and Apple's Swift. LLVM applies:
+- **Vectorization (SIMD)**: Automatically converts loops into AVX2/AVX-512 CPU vector instructions
+- **Loop Unrolling**: Removes branch overhead in tight hot loops
+- **Inlining & Dead Code Elimination**: Removes abstractions that add no cost
+- **Link-Time Optimization (LTO)**: Cross-module inlining for maximum throughput
+
+---
+
+#### 5. Fearless Concurrency (Data-Race-Free by Compile Time)
+Rust's type system **proves at compile time** that data races cannot occur:
+- \`Send\` trait: a type is safe to transfer ownership across threads
+- \`Sync\` trait: a type can be shared by reference across threads
+If your code has a data race, it **does not compile**. Concurrency bugs that Go or C++ only expose at runtime under load are impossible to ship in Rust.`,
+      keyPoints: [
+        'Rust achieves C-equivalent performance with zero runtime garbage collection overhead.',
+        'The borrow checker enforces memory safety at compile time: no use-after-free, no dangling pointers, no data races.',
+        'Generic monomorphization produces zero-cost abstractions — no vtable dispatch, no boxing overhead.',
+        'LLVM backend applies SIMD vectorization, inlining, loop unrolling, and LTO for optimal native code generation.',
+        'Fearless Concurrency: Send and Sync traits make data races a compile-time error, not a production incident.',
+      ],
+      chartData: {
+        type: 'bar',
+        title: 'Relative Execution Speed Benchmark (Lower is Faster, C = 1.0x Baseline)',
+        labels: ['Rust', 'C (clang)', 'C++ (clang)', 'Go', 'Java (JIT)', 'Python 3'],
+        values: [1.01, 1.0, 1.02, 1.21, 1.52, 48.0],
+        datasetLabel: 'Normalized Execution Time (×)',
+      },
+      subjectTag: 'computer_science',
+      searchKeywords: ['why rust is fast', 'rust ownership model', 'rust vs c performance', 'rust borrow checker explained', 'rust zero cost abstractions'],
+      slides: [
+        {
+          slideNumber: 1,
+          title: 'Why Rust Is Fast: The Core Performance Architecture',
+          subtitle: 'Zero GC overhead, compile-time safety, and LLVM native optimization',
+          layout: 'hero',
+          badge: 'Systems Performance',
+          keyConcept: 'Rust achieves C-equivalent native speed because: (1) no GC runtime, (2) ownership-based memory management, (3) LLVM optimizer, (4) zero-cost generic monomorphization.',
+          bulletPoints: [
+            { heading: 'No Garbage Collector', description: 'Memory is freed deterministically at compile-time by the ownership system — no GC threads, no stop-the-world pauses.', tag: 'Zero GC' },
+            { heading: 'Zero-Cost Abstractions', description: 'Generics, iterators, and closures compile to the same machine code as hand-written C. No runtime boxing or dispatch overhead.', tag: 'Monomorphization' },
+            { heading: 'LLVM Backend', description: 'Passes through the same optimizing compiler backend as clang/C++: SIMD vectorization, loop unrolling, LTO, and dead-code elimination.', tag: 'LLVM Optimizer' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Stack Overflow Record',
+            description: 'Rust has been voted the "Most Loved Programming Language" in the Stack Overflow Developer Survey for 9 consecutive years due to its unique combination of safety and speed.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 2,
+          title: 'Ownership & Borrow Checker: Safety Without Runtime Cost',
+          subtitle: 'How compile-time memory tracking eliminates GC and undefined behavior',
+          layout: 'process',
+          badge: 'Memory Safety',
+          keyConcept: 'Each value has exactly one owner. The borrow checker enforces safety invariants at compile time — zero runtime cost.',
+          bulletPoints: [
+            { heading: 'Single Owner Invariant', description: 'Each heap allocation has exactly one owner variable. When the owner goes out of scope, the allocator is called once to free it.', tag: 'Ownership' },
+            { heading: 'Borrow Rules', description: 'Either one mutable &mut reference OR any number of shared & references — never both. Enforced at compile time by the borrow checker.', tag: 'Borrow Checker' },
+            { heading: 'No Dangling Pointers', description: 'Lifetimes ensure no reference can ever outlive its owned data. Dangling pointers are a compile error.', tag: 'Lifetimes' },
+          ],
+          processSteps: [
+            'Value is created: memory is allocated on stack or heap',
+            'Ownership can be moved or borrowed (shared or mutable)',
+            'Borrow checker verifies no aliasing violations or use-after-move at compile time',
+            'When owner goes out of scope: drop() is inserted by compiler — deterministic deallocation',
+          ],
+          codeOrFormula: 'let s = String::from("hello"); // allocate\nlet r = &s;                   // borrow (safe)\nlet r2 = &mut s;             // ERROR: already borrowed!\n// s dropped here -> free() automatically',
+          callout: {
+            title: 'vs C++ Smart Pointers',
+            description: 'C++ shared_ptr uses atomic reference-counting at runtime (costly increment/decrement on every copy). Rust ownership is tracked exclusively at compile time — zero runtime counter operations.',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 3,
+          title: 'Zero-Cost Abstractions & Generic Monomorphization',
+          subtitle: 'Generics compile to specialized direct call code — no vtable, no boxing',
+          layout: 'deep_dive',
+          badge: 'Monomorphization',
+          keyConcept: 'Rust generics are code-generated per concrete type at compile time, producing the same assembly as a hand-written specialized function.',
+          bulletPoints: [
+            { heading: 'vs Java Generics', description: 'Java generics use type erasure + heap boxing + vtable dispatch. Rust generics produce distinct binary copies per type with direct inlined calls.', tag: 'vs Java' },
+            { heading: 'vs Go Interfaces', description: 'Go interface calls dispatch through a 2-pointer fat-pointer at runtime. Rust trait monomorphization emits a direct CALL instruction.', tag: 'vs Go' },
+            { heading: 'Iterator Fusion', description: 'Rust iterators chain operations (map, filter, collect) which the compiler fuses into a single O(N) loop with no intermediate allocations.', tag: 'Iterators' },
+          ],
+          processSteps: [],
+          codeOrFormula: '// This generic function:\nfn add<T: std::ops::Add>(a: T, b: T) -> T { a + b }\n// Produces TWO compiled functions:\n// add_i32(a: i32, b: i32) -> i32  { addl eax, edx }\n// add_f64(a: f64, b: f64) -> f64  { addsd xmm0, xmm1 }',
+          callout: {
+            title: 'Viva Question',
+            description: 'What does "zero-cost abstraction" mean in Rust? It means the abstraction incurs ZERO additional runtime cost compared to the most optimal equivalent hand-written code.',
+            type: 'tip',
+          },
+        },
+        {
+          slideNumber: 4,
+          title: 'Benchmarks: Rust vs C vs Go vs Python',
+          subtitle: 'Normalized execution time across compute-bound algorithmic workloads',
+          layout: 'chart',
+          badge: 'Performance Benchmark',
+          keyConcept: 'Rust sits within 1% of optimized C/C++ across CPU-intensive workloads, while Go costs 20% and Python 48× overhead.',
+          bulletPoints: [
+            { heading: 'Rust ≈ C Speed', description: 'Rust consistently benchmarks within 1–3% of equivalent C/C++ across sorting, cryptography, and matrix operations.', tag: '1% Overhead' },
+            { heading: 'Go GC Tax', description: 'Go benchmarks ~15–25% slower than Rust on CPU-bound workloads due to GC pause latency and runtime overhead.', tag: 'GC Pauses' },
+            { heading: 'Python Interpreted', description: 'CPython executes 30–100× slower on numeric workloads due to interpreter loop and reference counting overhead.', tag: '48× Slower' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Real-World Impact',
+            description: 'Discord rewrote their Go read-states service in Rust and eliminated GC-induced latency spikes (p99 latency dropped from 10–50ms to under 1ms consistently).',
+            type: 'insight',
+          },
+        },
+        {
+          slideNumber: 5,
+          title: 'Fearless Concurrency & Production Adoption',
+          subtitle: 'Data-race-free threading by compile-time proof + where Rust runs today',
+          layout: 'takeaways',
+          badge: 'Concurrency & Adoption',
+          keyConcept: 'Send and Sync traits make data races a compile-time error. Used in Linux kernel, Firefox, Windows, AWS, Cloudflare, Discord, and npm.',
+          bulletPoints: [
+            { heading: 'Send Trait', description: 'A type implementing Send can be safely moved to another thread. Types wrapping raw pointers are !Send and cannot be shared.', tag: 'Thread Safety' },
+            { heading: 'Sync Trait', description: 'A type implementing Sync can be shared by reference across threads. &T is Sync if T is Sync. Mutex<T> is Sync.', tag: 'Shared Refs' },
+            { heading: 'Production Reality', description: 'Linux 6.1+ merged Rust for kernel drivers. Microsoft rewrites Windows components in Rust to eliminate memory CVEs. Cloudflare, AWS Lambda, and npm run on Rust.', tag: 'Production' },
+          ],
+          processSteps: [],
+          codeOrFormula: null,
+          callout: {
+            title: 'Exam Cheat Sheet',
+            description: 'Why is Rust fast? No GC + compile-time ownership + LLVM + monomorphized generics. Why is it safe? Borrow checker enforces aliasing rules + lifetimes prevent dangling pointers + Send/Sync prevent data races — all at compile time.',
+            type: 'tip',
+          },
+        },
+      ],
+    };
+  }
+
+  // 6b. Recursion & Call Stack
+  if (q.includes('recursion') || q.includes('recursive') || q.includes('call stack') || (q.includes('stack') && q.includes('overflow'))) {
+    return {
+      refinedPrompt:
+        'Provide a detailed explanation of recursion, the call stack, and base case mechanics for B.Tech CSE students. Include stack frame structure, activation records, recursion trees, and tail-call optimization.',
+      explanation: `### Recursion & The Call Stack: Deep Technical Breakdown
+
+**Recursion** is a programming technique where a function calls itself with a smaller sub-problem until a **base case** terminates the chain. It is fundamental to Divide-and-Conquer algorithms, tree traversals, and dynamic programming.
+
+#### Core Mechanism: The Call Stack
+Every function call pushes an **activation record (stack frame)** onto the call stack:
+- **Return Address**: Where to return execution after the function completes
+- **Local Variables**: The function's private state (e.g. \`n\`, \`arr[low..high]\`)
+- **Parameters**: Input arguments passed to the function
+
+\`\`\`c
+int factorial(int n) {       // factorial(4) called
+    if (n == 0) return 1;   // Base Case: stack unwinds from here
+    return n * factorial(n - 1); // Pushes new frame: factorial(3), factorial(2), factorial(1), factorial(0)
+}
+\`\`\`
+
+| Stack Depth | Frame Contents |
+| :--- | :--- |
+| factorial(4) | n=4, waiting for factorial(3) |
+| factorial(3) | n=3, waiting for factorial(2) |
+| factorial(2) | n=2, waiting for factorial(1) |
+| factorial(1) | n=1, waiting for factorial(0) |
+| factorial(0) | **Base case** → returns 1 → stack unwinds upward |`,
+      keyPoints: [
+        'Each recursive call creates a new activation record (stack frame) on the call stack.',
+        'Base case must be defined to prevent infinite recursion and StackOverflowError.',
+        'Recursion depth is bounded by OS stack size (typically 1 MB to 8 MB).',
+        'Tail recursion can be optimized by compilers to run in O(1) stack space.',
+      ],
+      chartData: null,
+      subjectTag: 'computer_science',
+      searchKeywords: ['recursion explained', 'call stack recursion', 'recursion vs iteration', 'base case recursion'],
+      slides: [],
+    };
+  }
+
+  // 7. Generic Dynamic Synthesis for All Other Questions
+  // This is a LAST RESORT. The generic template text is useless — return a minimal stub
+  // so generateStructuredAnswer always prefers the LLM or a specific KB entry above.
   const cleanTopic = extractCleanTopic(question);
   const tag = inferSubjectTag(question);
 
   return {
-    refinedPrompt: `Provide an in-depth, structured university-level conceptual breakdown of "${question}". Detail core definitions, underlying architecture, practical applications, technical trade-offs, and empirical visual metric distribution.`,
-    explanation: `### Comprehensive Analysis: ${cleanTopic.toUpperCase()}
+    refinedPrompt: `Provide an in-depth, structured university-level conceptual breakdown of "${question}". Detail core definitions, underlying architecture, practical applications, technical trade-offs, and real code examples where applicable.`,
+    // Explanation intentionally minimal — if LLM is unavailable this displays, but it
+    // won't have the misleading "Mastering..." generic key-points any more.
+    explanation: `### ${cleanTopic.replace(/\b\w/g, (l) => l.toUpperCase())}: Technical Overview
 
-Understanding **${cleanTopic}** requires dissecting its theoretical foundation, underlying engineering mechanisms, and practical operational constraints.
+This is a **${tag.replace('_', ' ')}** topic. Connect a custom LLM model in the **Model** settings (top nav) to get a detailed, context-rich explanation, slide deck, and viva preparation for this question.
 
-#### 1. Core Principles & Foundational Architecture
-At its base, this domain balances functional correctness with execution efficiency. Key components interact to provide deterministic output while managing resource utilization, latency, and reliability.
+#### What you asked:
+> ${question}
 
-#### 2. Technical Mechanics & Workflow
-1. **Pre-condition Validation**: Incoming state parameters are verified against system invariants.
-2. **Core Computational Lifecycle**: Operations are sequenced to avoid race conditions or invalid transitions.
-3. **Termination & Output Handling**: Resources are safely released and results are propagated to caller boundaries.
+---
 
-#### 3. Key Design Trade-offs
-- **Performance vs Complexity**: Highly optimized implementations require stricter boundary constraints.
-- **Maintainability vs Resource Footprint**: Clean abstractions isolate failures but may introduce minimal indirection overhead.`,
+**To get a full answer, configure your model:**
+1. Click the **Model** button in the top navigation bar.
+2. Select your provider (OpenAI, Gemini, Groq, Ollama, etc.)
+3. Enter your API key and click **Save Configuration**.
+4. Re-ask your question.`,
     keyPoints: [
-      `Mastering ${cleanTopic} is essential for sound architectural decisions in ${tag.replace('_', ' ')}.`,
-      'Key design trade-offs must balance throughput, latency, and state consistency.',
-      'Always verify edge-case boundary conditions to maintain system stability.',
-      'Empirical measurements must guide architectural optimizations.',
+      `Configure an LLM model to get a full technical breakdown of ${cleanTopic}.`,
+      'Clario supports OpenAI, Google Gemini, Groq, DeepSeek, Anthropic Claude, and local Ollama models.',
+      'Once connected, every question generates a full slide deck, charts, and viva preparation.',
     ],
-    chartData: {
-      type: 'bar',
-      title: `${cleanTopic} Operational Factor Distribution`,
-      labels: ['Foundational Architecture', 'Core Processing', 'Boundary Validation', 'Performance Tuning'],
-      values: [35, 30, 20, 15],
-      datasetLabel: 'Resource & Complexity Weighting (%)',
-    },
+    chartData: null,
     subjectTag: tag,
-    searchKeywords: [cleanTopic, `${cleanTopic} explained`, `${cleanTopic} tutorial`, `${cleanTopic} concepts`],
-    slides: [
-      {
-        slideNumber: 1,
-        title: `${cleanTopic.replace(/\b\w/g, (l) => l.toUpperCase())}: Architecture & Core Principles`,
-        subtitle: 'Foundational taxonomy, motivation, and operational taxonomy',
-        layout: 'hero',
-        badge: 'Executive Brief',
-        keyConcept: `Mastering ${cleanTopic} provides the mental model needed to solve real-world engineering constraints in ${tag.replace('_', ' ')}.`,
-        bulletPoints: [
-          { heading: 'Core Definition', description: `Theoretical basis governing operational behavior in ${tag.replace('_', ' ')}.`, tag: 'Definition' },
-          { heading: 'System Objective', description: 'Optimizing resource throughput, correctness, and deterministic repeatability.', tag: 'Objective' },
-          { heading: 'Academic Context', description: 'Core syllabus topic evaluated across university viva and technical interviews.', tag: 'Relevance' },
-        ],
-        processSteps: [],
-        codeOrFormula: null,
-        callout: {
-          title: 'Central Insight',
-          description: `Every complex manifestation of ${cleanTopic} stems from foundational primitives working in concert.`,
-          type: 'insight',
-        },
-      },
-      {
-        slideNumber: 2,
-        title: 'Operational Workflow & Architecture',
-        subtitle: 'Sequential step-by-step pipeline from input initiation to final output',
-        layout: 'process',
-        badge: 'Process Lifecycle',
-        keyConcept: 'Deterministic state transitions guarantee that components operate without data inconsistency.',
-        bulletPoints: [
-          { heading: 'Phase 1: Ingestion', description: 'Receives and sanitizes baseline parameters, validating state preconditions.', tag: 'Step 1' },
-          { heading: 'Phase 2: Processing', description: 'Executes transformation logic according to algorithmic rules and state tables.', tag: 'Step 2' },
-          { heading: 'Phase 3: Finalization', description: 'Emits finalized computation and unwinds intermediate resource bindings.', tag: 'Step 3' },
-        ],
-        processSteps: [
-          'State 1: Pre-condition verification & resource allocation',
-          'State 2: Computational execution & transformation cycle',
-          'State 3: Error checking, boundary assertion & validation',
-          'State 4: Terminal resolution & return payload emission',
-        ],
-        codeOrFormula: null,
-        callout: {
-          title: 'Architectural Invariant',
-          description: 'Boundary checks must precede processing to prevent unhandled exceptions or invalid state transitions.',
-          type: 'warning',
-        },
-      },
-      {
-        slideNumber: 3,
-        title: 'Empirical Factor Distribution & Metrics',
-        subtitle: 'Quantitative breakdown across key engineering dimensions',
-        layout: 'chart',
-        badge: 'Empirical Analysis',
-        keyConcept: 'Empirical benchmarking reveals trade-offs between implementation effort and system throughput.',
-        bulletPoints: [
-          { heading: 'Metric Analysis', description: 'Foundational architecture and core processing dominate overall complexity.', tag: 'Dominant Factor' },
-          { heading: 'Optimization Focus', description: 'Profile hotspots before attempting premature optimization.', tag: 'Profiling' },
-        ],
-        processSteps: [],
-        codeOrFormula: null,
-        callout: {
-          title: 'Benchmark Conclusion',
-          description: 'Always rely on empirical measurement rather than assumptions when evaluating architectural choices.',
-          type: 'tip',
-        },
-      },
-      {
-        slideNumber: 4,
-        title: 'Exam Revision & Key Viva Takeaways',
-        subtitle: 'Crucial concepts to remember for exam answers and technical interviews',
-        layout: 'takeaways',
-        badge: 'Revision Matrix',
-        keyConcept: 'Synthesize your understanding around trade-offs, edge cases, and architectural best practices.',
-        bulletPoints: [
-          { heading: 'Core Principle Recap', description: 'Always begin explanations with the formal computational definition.', tag: 'Viva Rule 1' },
-          { heading: 'Boundary Edge Cases', description: 'State what happens when inputs are null, empty, or at maximum capacity.', tag: 'Viva Rule 2' },
-          { heading: 'Trade-offs & Constraints', description: 'Compare this approach with its primary architectural alternatives.', tag: 'Viva Rule 3' },
-        ],
-        processSteps: [],
-        codeOrFormula: null,
-        callout: {
-          title: 'High-Yield Formula',
-          description: 'Define ➔ Illustrate Workflow ➔ State Edge Cases ➔ Justify Trade-offs.',
-          type: 'tip',
-        },
-      },
-    ],
+    searchKeywords: [cleanTopic, `${cleanTopic} explained`, `${cleanTopic} tutorial`],
+    slides: [],
   };
 };
 
